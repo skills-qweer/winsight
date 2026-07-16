@@ -18,7 +18,7 @@ If files conflict with code or test evidence, stop implementation, reconcile the
 - Read every current-truth file listed in `AGENTS.md`.
 - Inspect `git status --short` and relevant diffs.
 - Run `python scripts/check_project_docs.py`.
-- Confirm there is exactly one `IN_PROGRESS` task.
+- Confirm there is exactly one current task. It may be awaiting acceptance, blocked, or deferred instead of `IN_PROGRESS`.
 - Confirm the requested work belongs to that task. If not, update the task files before editing.
 
 ## Status vocabulary
@@ -36,8 +36,8 @@ If files conflict with code or test evidence, stop implementation, reconcile the
 
 ## One-task rule
 
-- `CURRENT_TASK.md` contains exactly one active task.
-- `ROADMAP.md` may contain many items but exactly one line may be `IN_PROGRESS`.
+- `CURRENT_TASK.md` contains exactly one current task.
+- `ROADMAP.md` may contain many items but exactly one line must match the current task and its state (`IN_PROGRESS`, `NEEDS_USER_ACCEPTANCE`, `BLOCKED`, or `DEFERRED`).
 - A newly requested task replaces or defers the active task only after state files are updated.
 - Do not expand into adjacent roadmap items merely because they are convenient.
 

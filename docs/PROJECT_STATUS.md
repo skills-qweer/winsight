@@ -1,10 +1,10 @@
 # Project status
 
 - Project: WinSight
-- Phase: v0.1 publish and local installation
-- Overall: foundation capture path is `AUTO_VERIFIED`; publication is `IN_PROGRESS`
+- Phase: v0.1 new-task acceptance
+- Overall: foundation, publication, and installation are `AUTO_VERIFIED`; cross-task use is `NEEDS_USER_ACCEPTANCE`
 - Current task: `WS-002`
-- Current task state: `IN_PROGRESS`
+- Current task state: `NEEDS_USER_ACCEPTANCE`
 - Last updated: 2026-07-17
 
 ## Progress summary
@@ -15,17 +15,17 @@
 | Window discovery | AUTO_VERIFIED | WeChat DevTools HWND and bounds resolved |
 | PrintWindow capture | AUTO_VERIFIED | 1618x1075 frame, mean RGB 45.07 |
 | Black-frame scoring | AUTO_VERIFIED | Capture result exposes luminance/range classification |
-| Anti-drift workflow | IN_PROGRESS | State files and consistency gate being added |
-| GitHub publication | IN_PROGRESS | Empty repository confirmed; initial push pending |
-| Codex installation | PLANNED | Install after publication and marketplace wiring |
+| Anti-drift workflow | AUTO_VERIFIED | Consistency gate passed |
+| GitHub publication | AUTO_VERIFIED | Commit `2b8d53a` pushed to `main` |
+| Codex skill installation | AUTO_VERIFIED | Installed to `D:\CodexHome\skills\winsight` |
 | WGC version-safe backend | PLANNED | `WS-003` |
 | DXGI Desktop Duplication | PLANNED | `WS-004` |
 | Direct MCP image tools | PLANNED | `WS-005` |
 
 ## Next action
 
-Finish the repository consistency gate, rerun validation, commit and push to `https://github.com/skills-qweer/winsight`, then install WinSight and verify it from a new task.
+Complete M04 from a new Codex task: ask that task to use WinSight to capture a Windows app, then explicitly accept or report the result.
 
 ## User involvement
 
-See `docs/ACCEPTANCE.md`. The next required user-visible checkpoint is `M04`, using WinSight from a new Codex task after installation.
+See `docs/ACCEPTANCE.md`. M04 now requires the user because installed skills are picked up at the next task boundary.

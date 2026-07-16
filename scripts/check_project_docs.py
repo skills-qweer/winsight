@@ -26,6 +26,7 @@ ALLOWED_ACCEPTANCE_STATES = {
     "BLOCKED",
     "DEFERRED",
 }
+CURRENT_TASK_STATES = {"IN_PROGRESS", "NEEDS_USER_ACCEPTANCE", "BLOCKED", "DEFERRED"}
 
 
 def read(path: Path) -> str:
@@ -62,16 +63,19 @@ def main() -> int:
         errors.append(str(error))
         current_id = current_state = status_id = status_state = ""
 
-    if current_state != "IN_PROGRESS":
-        errors.append(f"CURRENT_TASK state must be IN_PROGRESS, got {current_state!r}")
+    if current_state not in CURRENT_TASK_STATES:
+        errors.append(f"CURRENT_TASK state must be one of {sorted(CURRENT_TASK_STATES)}, got {current_state!r}")
     if current_id != status_id:
         errors.append(f"Current task mismatch: CURRENT_TASK={current_id}, PROJECT_STATUS={status_id}")
     if current_state != status_state:
         errors.append(f"Current state mismatch: CURRENT_TASK={current_state}, PROJECT_STATUS={status_state}")
 
-    in_progress_rows = re.findall(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*IN_PROGRESS\s*\|", roadmap, re.MULTILINE)
-    if in_progress_rows != [current_id]:
-        errors.append(f"ROADMAP must contain exactly one IN_PROGRESS row for {current_id}; got {in_progress_rows}")
+    roadmap_rows = re.findall(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|", roadmap, re.MULTILINE)
+    active_rows = [(task_id.strip(), task_state.strip()) for task_id, task_state in roadmap_rows if task_state.strip() in CURRENT_TASK_STATES]
+    if active_rows != [(current_id, current_state)]:
+        errors.append(
+            f"ROADMAP must contain exactly one current row for {current_id} ({current_state}); got {active_rows}"
+        )
 
     for line_number, line in enumerate(acceptance.splitlines(), start=1):
         if not re.match(r"^\|\s*M\d+\s*\|", line):
