@@ -1,57 +1,69 @@
 ---
 name: winsight
-description: Reliable Windows window discovery and screenshot capture with black-frame detection and backend fallback. Use when Codex needs to inspect a native Windows app, Chromium/Electron/Cocos/Qt window, simulator, game editor, or other desktop surface and ordinary Computer Use screenshots fail, return black, report Windows.Graphics.Capture or SetIsBorderRequired errors, or cannot capture an occluded window.
+description: Reliable Windows window discovery, direct image capture, DPI-aware coordinate mapping, and prepared controlled local input with black-frame detection and backend fallback. Use when Codex needs to inspect or operate a native Windows app, Chromium/Electron/Cocos/Qt window, simulator, game editor, or other desktop surface and ordinary Computer Use screenshots fail, return black, report Windows.Graphics.Capture or SetIsBorderRequired errors, or cannot safely map a visible target to input coordinates.
 ---
 
 # WinSight
 
-Use the bundled PowerShell entrypoint to discover and capture Windows windows without changing system settings. Treat WinSight as an observation tool; keep input, authentication, permissions, uploads, and other consequential actions in the normal approved Computer Use flow.
+Prefer WinSight MCP tools when they are available. They return images directly and connect current window observation to bounded local input. Use the bundled PowerShell scripts only as a capture fallback or for development tests.
 
-## Workflow
+## Observe
 
-1. Run diagnostics when the failure mentions WGC, `SetIsBorderRequired`, `E_NOINTERFACE`, or `0x80004002`:
+1. Call `list_windows` and select an exact HWND when title/process matching is ambiguous.
+2. Call `capture_window` with `backend=auto`.
+3. Require valid PNG content, successful metadata, and `LikelyBlackFrame=false` before reasoning from the image.
+4. Use `diagnose_capture` for WGC, `SetIsBorderRequired`, `E_NOINTERFACE`, or `0x80004002` failures.
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action diagnose
-   ```
+## Map coordinates
 
-2. List windows when the HWND or exact title is unknown:
+Call `map_coordinates` with one of:
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action list
-   ```
+- `window_pixels`: coordinates from the returned full-window PNG.
+- `client_pixels`: coordinates within the current client area.
+- `normalized`: values from 0 to 1 for resize-tolerant locations.
+- `logical`: coordinates in an app/game logical resolution plus `logicalWidth` and `logicalHeight`.
 
-3. Capture by title, process, or HWND. Prefer HWND after discovery when titles are ambiguous:
+Check the returned screen, capture-pixel, bounds, DPI, and scale metadata. Re-map after a move, resize, DPI change, title change, or window recreation.
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action capture -Hwnd 123456 -Backend auto
-   ```
+## Operate a safe local app
 
-4. Parse the JSON result. Require `selected.success=true`, `selected.likelyBlackFrame=false`, and an existing `selected.outputPath` before using the image.
+1. Call `prepare_input` with an exact HWND and a click or allowlisted key.
+2. Inspect the returned current image and mapping. Preparation does not execute input.
+3. Call `execute_prepared_input` with the token. It executes automatically only if the token is unexpired and the HWND identity, title, bounds, client bounds, and DPI are unchanged.
+4. Capture again and verify the visible result. Do not treat the input API return value alone as success.
 
-5. Inspect the returned PNG with the local image viewer. Do not claim visual success from exit code alone.
+Tokens expire after 30 seconds and are single-use. Use `emergency_stop_input` to cancel all pending input and disable execution; use `resume_input` to resume safe local actions.
 
-## Backend selection
+## Input boundaries
 
-- Use `auto` by default. It tries off-screen-capable `PrintWindow(PW_RENDERFULLCONTENT)` first and visible-screen GDI capture second.
-- Use `printwindow` for Chromium/Electron, Cocos Creator, WeChat DevTools, Qt, and occluded windows.
-- Use `gdi-screen` only when the target is visibly unobscured; it captures whatever is physically displayed in the target rectangle.
-- Read [references/backends.md](references/backends.md) before adding WGC, DXGI Desktop Duplication, multi-monitor, or continuous-frame support.
+- Do not use WinSight input for authentication, login, passwords, CAPTCHA, payment, permissions, privacy/security settings, password managers, or Windows security surfaces. The MCP server blocks known cases, but the agent must still respect the visible surface.
+- Do not use WinSight to submit uploads, publish releases, send messages, change sharing, install software, or perform other consequential external actions unless the user separately authorized that exact action.
+- Do not call `input.ps1` directly during normal use; the MCP prepare/execute handshake provides stale-window and replay protection.
+- Safe local game, simulator, editor, menu, navigation, and test interactions may proceed automatically when already authorized by the user.
 
-## Safety and integrity
+## Script fallback
 
-- Do not use WinSight to bypass protected-content flags, DRM, authentication dialogs, CAPTCHA, Windows security surfaces, or privacy controls.
-- Do not add hidden input injection, process injection, capture hooks, or security-setting changes to the skill.
-- Preserve the JSON evidence for backend, frame dimensions, mean RGB, color range, and black-frame classification.
-- Stop after repeated black frames; choose another documented backend or ask the user to expose the window.
-- Keep temporary captures out of source control unless the user explicitly requests fixtures.
+Run diagnostics:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action diagnose
+```
+
+Capture by exact HWND:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action capture -Hwnd 123456 -Backend auto
+```
+
+Use `auto` by default. It currently tries off-screen-capable `PrintWindow(PW_RENDERFULLCONTENT)` first and visible-screen GDI capture second. Read [references/backends.md](references/backends.md) before extending WGC, DXGI, continuous capture, or OCR.
 
 ## Validation
 
-Run the bundled real-window test against an already open window:
+Run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-winsight.ps1 -Title "FogHarborEchoes"
+node scripts/test_mcp.mjs
+python scripts/check_project_docs.py
 ```
 
-Then run the skill and plugin validators before publishing.
+For a supervised real-input test, run `scripts/test_mcp_input.mjs` with an explicit window title, pixel coordinate, and `--execute`, then inspect its after-capture PNG.

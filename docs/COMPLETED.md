@@ -49,3 +49,30 @@ Evidence:
 - Skill installer reported successful installation
 
 Keep WS-002 as the current acceptance task until the user completes M04; do not begin WS-003 implicitly.
+
+## WS-003 - MCP image and controlled-input foundation
+
+- Development completed: 2026-07-17
+- Development state: `AUTO_VERIFIED`
+- Acceptance: M06-M08 are `AUTO_VERIFIED`; ordinary safe local input does not require per-action user confirmation
+
+Delivered:
+
+- Dependency-free MCP stdio server with eight window, capture, mapping, input, and emergency-control tools
+- Direct PNG image content plus capture/backend/frame-quality metadata
+- Window, client, normalized, and logical coordinate spaces with DPI-aware screen mapping
+- Short-lived, single-use prepared-input tokens bound to HWND, process, title, bounds, client bounds, DPI, and action
+- Revalidation, expiration, replay rejection, emergency stop, and sensitive-surface blocking
+- Robust foreground activation followed by bounded click and allowlisted-key input
+- Protocol, mapping, guard, and supervised real-input test scripts
+
+Evidence:
+
+- MCP initialize and `tools/list`: passed; server `0.2.0`, eight tools
+- WeChat MCP capture: valid PNG signature `89504e470d0a1a0a`, 1618x1075, backend `printwindow`
+- Normalized center mapped to capture pixel 809,537 and screen pixel 1683,839 at DPI 96
+- Benign WeChat game click executed and the after-capture visibly advanced to Chapter 1
+- Emergency-stop rejection and Creator login-surface guard passed
+- Skill, plugin, and project-document validators passed
+
+M03-M05 remain in `ACCEPTANCE.md`; their pending state does not reopen WS-003 development.

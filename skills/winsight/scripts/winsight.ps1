@@ -49,6 +49,14 @@ function Get-WinSightWindows {
                 width = $window.Width
                 height = $window.Height
             }
+            clientBounds = [pscustomobject]@{
+                x = $window.ClientX
+                y = $window.ClientY
+                width = $window.ClientWidth
+                height = $window.ClientHeight
+            }
+            dpi = $window.Dpi
+            dpiScale = [math]::Round($window.Dpi / 96.0, 4)
         }
     }
 }

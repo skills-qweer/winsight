@@ -11,6 +11,14 @@ The first working release provides:
 - diagnosis of Windows build/API compatibility;
 - a reusable Codex skill with deterministic scripts.
 
+Version 0.2 adds a local MCP server with:
+
+- direct PNG image responses;
+- DPI-aware window/client/normalized/logical coordinate mapping;
+- short-lived single-use prepared clicks and allowlisted key presses;
+- target identity and bounds revalidation before input;
+- emergency stop, replay protection, and blocked sensitive surfaces.
+
 The implementation is independent and uses public Windows APIs. It does not copy proprietary code from streaming applications.
 
 ## Quick test
@@ -19,6 +27,7 @@ The implementation is independent and uses public Windows APIs. It does not copy
 & '.\skills\winsight\scripts\winsight.ps1' -Action diagnose
 & '.\skills\winsight\scripts\winsight.ps1' -Action list
 & '.\skills\winsight\scripts\winsight.ps1' -Action capture -Title 'FogHarborEchoes' -Backend auto
+node .\scripts\test_mcp.mjs
 ```
 
 ## Roadmap

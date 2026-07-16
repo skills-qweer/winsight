@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 public static class WinSightNative
 {
@@ -14,6 +15,13 @@ public static class WinSightNative
         public int Top;
         public int Right;
         public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
     }
 
     public sealed class WindowInfo
@@ -27,6 +35,11 @@ public static class WinSightNative
         public int Y { get; set; }
         public int Width { get; set; }
         public int Height { get; set; }
+        public int ClientX { get; set; }
+        public int ClientY { get; set; }
+        public int ClientWidth { get; set; }
+        public int ClientHeight { get; set; }
+        public int Dpi { get; set; }
     }
 
     public sealed class CaptureInfo
@@ -41,6 +54,17 @@ public static class WinSightNative
         public double RangeRgb { get; set; }
         public int SampleCount { get; set; }
         public bool LikelyBlackFrame { get; set; }
+    }
+
+    public sealed class InputInfo
+    {
+        public bool Success { get; set; }
+        public string Action { get; set; }
+        public long Hwnd { get; set; }
+        public int ScreenX { get; set; }
+        public int ScreenY { get; set; }
+        public int VirtualKey { get; set; }
+        public string Error { get; set; }
     }
 
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
@@ -65,6 +89,51 @@ public static class WinSightNative
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr hwnd, ref POINT point);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint attachThread, uint attachToThread, bool attach);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetActiveWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetFocus(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
+
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
 
     [DllImport("user32.dll")]
     private static extern bool PrintWindow(IntPtr hwnd, IntPtr targetDc, uint flags);
@@ -93,6 +162,20 @@ public static class WinSightNative
                 return true;
             }
 
+            RECT clientRect;
+            POINT clientOrigin = new POINT { X = 0, Y = 0 };
+            bool hasClientRect = GetClientRect(hwnd, out clientRect) && ClientToScreen(hwnd, ref clientOrigin);
+            int dpi = 96;
+            try
+            {
+                uint windowDpi = GetDpiForWindow(hwnd);
+                if (windowDpi > 0) dpi = unchecked((int)windowDpi);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                dpi = 96;
+            }
+
             windows.Add(new WindowInfo
             {
                 Hwnd = hwnd.ToInt64(),
@@ -103,7 +186,12 @@ public static class WinSightNative
                 X = rect.Left,
                 Y = rect.Top,
                 Width = Math.Max(0, rect.Right - rect.Left),
-                Height = Math.Max(0, rect.Bottom - rect.Top)
+                Height = Math.Max(0, rect.Bottom - rect.Top),
+                ClientX = hasClientRect ? clientOrigin.X : rect.Left,
+                ClientY = hasClientRect ? clientOrigin.Y : rect.Top,
+                ClientWidth = hasClientRect ? Math.Max(0, clientRect.Right - clientRect.Left) : Math.Max(0, rect.Right - rect.Left),
+                ClientHeight = hasClientRect ? Math.Max(0, clientRect.Bottom - clientRect.Top) : Math.Max(0, rect.Bottom - rect.Top),
+                Dpi = dpi
             });
             return true;
         }, IntPtr.Zero);
@@ -191,6 +279,82 @@ public static class WinSightNative
         }
     }
 
+    public static InputInfo ClickWindow(long hwndValue, int screenX, int screenY)
+    {
+        IntPtr hwnd = new IntPtr(hwndValue);
+        RECT rect;
+        if (!IsWindow(hwnd) || !GetWindowRect(hwnd, out rect))
+        {
+            return InputFailure("click", hwndValue, "Target window is not valid");
+        }
+        if (screenX < rect.Left || screenX >= rect.Right || screenY < rect.Top || screenY >= rect.Bottom)
+        {
+            return InputFailure("click", hwndValue, "Screen coordinate is outside the current window bounds");
+        }
+
+        try
+        {
+            if (!ActivateWindow(hwnd))
+            {
+                return InputFailure("click", hwndValue, "Target window could not be activated");
+            }
+            if (!SetCursorPos(screenX, screenY))
+            {
+                return InputFailure("click", hwndValue, "SetCursorPos failed");
+            }
+            mouse_event(0x0002u, 0, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(35);
+            mouse_event(0x0004u, 0, 0, 0, UIntPtr.Zero);
+            return new InputInfo
+            {
+                Success = true,
+                Action = "click",
+                Hwnd = hwndValue,
+                ScreenX = screenX,
+                ScreenY = screenY
+            };
+        }
+        catch (Exception exception)
+        {
+            return InputFailure("click", hwndValue, exception.Message);
+        }
+    }
+
+    public static InputInfo KeyPressWindow(long hwndValue, int virtualKey)
+    {
+        IntPtr hwnd = new IntPtr(hwndValue);
+        if (!IsWindow(hwnd))
+        {
+            return InputFailure("key", hwndValue, "Target window is not valid");
+        }
+        if (virtualKey <= 0 || virtualKey > 255)
+        {
+            return InputFailure("key", hwndValue, "Virtual key is outside the supported range");
+        }
+
+        try
+        {
+            if (!ActivateWindow(hwnd))
+            {
+                return InputFailure("key", hwndValue, "Target window could not be activated");
+            }
+            keybd_event(unchecked((byte)virtualKey), 0, 0, UIntPtr.Zero);
+            Thread.Sleep(35);
+            keybd_event(unchecked((byte)virtualKey), 0, 0x0002u, UIntPtr.Zero);
+            return new InputInfo
+            {
+                Success = true,
+                Action = "key",
+                Hwnd = hwndValue,
+                VirtualKey = virtualKey
+            };
+        }
+        catch (Exception exception)
+        {
+            return InputFailure("key", hwndValue, exception.Message);
+        }
+    }
+
     private static CaptureInfo Analyze(Bitmap bitmap, string backend, string outputPath)
     {
         int stepX = Math.Max(1, bitmap.Width / 64);
@@ -239,5 +403,52 @@ public static class WinSightNative
             Error = error,
             LikelyBlackFrame = true
         };
+    }
+
+    private static InputInfo InputFailure(string action, long hwndValue, string error)
+    {
+        return new InputInfo
+        {
+            Success = false,
+            Action = action,
+            Hwnd = hwndValue,
+            Error = error
+        };
+    }
+
+    private static bool ActivateWindow(IntPtr hwnd)
+    {
+        ShowWindow(hwnd, 9);
+        uint currentThread = GetCurrentThreadId();
+        uint ignoredProcess;
+        uint targetThread = GetWindowThreadProcessId(hwnd, out ignoredProcess);
+        IntPtr foreground = GetForegroundWindow();
+        uint foregroundThread = foreground == IntPtr.Zero ? 0 : GetWindowThreadProcessId(foreground, out ignoredProcess);
+        bool attachedTarget = false;
+        bool attachedForeground = false;
+
+        try
+        {
+            if (targetThread != 0 && targetThread != currentThread)
+            {
+                attachedTarget = AttachThreadInput(currentThread, targetThread, true);
+            }
+            if (foregroundThread != 0 && foregroundThread != currentThread && foregroundThread != targetThread)
+            {
+                attachedForeground = AttachThreadInput(currentThread, foregroundThread, true);
+            }
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            SetActiveWindow(hwnd);
+            SetFocus(hwnd);
+        }
+        finally
+        {
+            if (attachedForeground) AttachThreadInput(currentThread, foregroundThread, false);
+            if (attachedTarget) AttachThreadInput(currentThread, targetThread, false);
+        }
+
+        Thread.Sleep(120);
+        return GetForegroundWindow() == hwnd;
     }
 }

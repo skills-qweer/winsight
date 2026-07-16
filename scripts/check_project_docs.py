@@ -71,11 +71,16 @@ def main() -> int:
         errors.append(f"Current state mismatch: CURRENT_TASK={current_state}, PROJECT_STATUS={status_state}")
 
     roadmap_rows = re.findall(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|", roadmap, re.MULTILINE)
-    active_rows = [(task_id.strip(), task_state.strip()) for task_id, task_state in roadmap_rows if task_state.strip() in CURRENT_TASK_STATES]
-    if active_rows != [(current_id, current_state)]:
+    normalized_rows = [(task_id.strip(), task_state.strip()) for task_id, task_state in roadmap_rows]
+    current_rows = [row for row in normalized_rows if row[0] == current_id]
+    if current_rows != [(current_id, current_state)]:
         errors.append(
-            f"ROADMAP must contain exactly one current row for {current_id} ({current_state}); got {active_rows}"
+            f"ROADMAP must contain exactly one current row for {current_id} ({current_state}); got {current_rows}"
         )
+    in_progress_ids = [task_id for task_id, task_state in normalized_rows if task_state == "IN_PROGRESS"]
+    expected_in_progress = [current_id] if current_state == "IN_PROGRESS" else []
+    if in_progress_ids != expected_in_progress:
+        errors.append(f"ROADMAP IN_PROGRESS rows must be {expected_in_progress}; got {in_progress_ids}")
 
     for line_number, line in enumerate(acceptance.splitlines(), start=1):
         if not re.match(r"^\|\s*M\d+\s*\|", line):

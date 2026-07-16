@@ -23,3 +23,15 @@
 - Date: 2026-07-17
 - Decision: Use repository state files, one active task, a consistency gate, and separate `AUTO_VERIFIED` from `USER_ACCEPTED`.
 - Reason: Long chats may lose or distort plans; future tasks must reconstruct state from the repository.
+
+## D005 - Controlled input requires prepared observation
+
+- Date: 2026-07-17
+- Decision: Input actions use a two-step prepare/execute flow with a short-lived single-use token bound to HWND, bounds, coordinates, and action.
+- Reason: External screenshots must not become blind or stale coordinate clicks. Safe local actions may execute automatically after revalidation; authentication, security, payment, permission, CAPTCHA, and password surfaces remain blocked.
+
+## D006 - Gift-event analogy is not product scope
+
+- Date: 2026-07-17
+- Decision: Do not add gift-event rules, Douyin integration, or routine per-click user confirmation. Continue the original window capture, mapping, tracking, OCR, change-detection, recording, and safe local input roadmap.
+- Reason: The gift example was only a possible implementation analogy and introduced unrelated scope and unnecessary friction.

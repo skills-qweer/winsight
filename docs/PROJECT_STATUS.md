@@ -1,10 +1,10 @@
 # Project status
 
 - Project: WinSight
-- Phase: v0.1 new-task acceptance
-- Overall: foundation, publication, and installation are `AUTO_VERIFIED`; cross-task use is `NEEDS_USER_ACCEPTANCE`
-- Current task: `WS-002`
-- Current task state: `NEEDS_USER_ACCEPTANCE`
+- Phase: v0.3 native multi-backend capture
+- Overall: v0.2 MCP and controlled input are `AUTO_VERIFIED`; native WGC/DXGI work is `IN_PROGRESS`
+- Current task: `WS-004`
+- Current task state: `IN_PROGRESS`
 - Last updated: 2026-07-17
 
 ## Progress summary
@@ -18,14 +18,16 @@
 | Anti-drift workflow | AUTO_VERIFIED | Consistency gate passed |
 | GitHub publication | AUTO_VERIFIED | Commit `2b8d53a` pushed to `main` |
 | Codex skill installation | AUTO_VERIFIED | Installed to `D:\CodexHome\skills\winsight` |
-| WGC version-safe backend | PLANNED | `WS-003` |
-| DXGI Desktop Duplication | PLANNED | `WS-004` |
-| Direct MCP image tools | PLANNED | `WS-005` |
+| Direct MCP image tools | AUTO_VERIFIED | Valid 1618x1075 PNG returned through MCP |
+| Controlled input handshake | AUTO_VERIFIED | Benign game click visibly advanced to Chapter 1; guards passed |
+| DPI/client coordinate mapping | AUTO_VERIFIED | Window/client/normalized/logical mappings tested at DPI 96 |
+| WGC and DXGI backends | IN_PROGRESS | `WS-004` |
+| Tracking, change detection, recording, OCR | PLANNED | `WS-005` |
 
 ## Next action
 
-Complete M04 from a new Codex task: ask that task to use WinSight to capture a Windows app, then explicitly accept or report the result.
+Inventory local Windows capture runtimes and implement the version-safe native backend helper selected for WS-004.
 
 ## User involvement
 
-See `docs/ACCEPTANCE.md`. M04 now requires the user because installed skills are picked up at the next task boundary.
+M03-M05 remain pending explicit acceptance. M06-M08 are automatically verified. Routine safe local app input proceeds without per-action confirmation; sensitive or consequential surfaces remain blocked or require exact authorization.

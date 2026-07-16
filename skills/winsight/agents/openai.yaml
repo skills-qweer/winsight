@@ -1,4 +1,4 @@
 interface:
   display_name: "WinSight"
-  short_description: "Capture Windows apps when normal screenshots fail"
-  default_prompt: "Use WinSight to capture and inspect the Windows app I am working with."
+  short_description: "See and safely operate Windows apps when capture fails"
+  default_prompt: "Use WinSight to capture this Windows app, map the target, and perform a safe local interaction."

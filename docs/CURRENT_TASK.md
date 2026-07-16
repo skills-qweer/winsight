@@ -1,36 +1,37 @@
 # Current task
 
-- ID: `WS-002`
-- Title: Accept WinSight v0.1 from a new Codex task
-- State: `NEEDS_USER_ACCEPTANCE`
-- Owner: User with Codex support
+- ID: `WS-004`
+- Title: Add version-safe WGC and DXGI capture backends
+- State: `IN_PROGRESS`
+- Owner: Codex
 - Last updated: 2026-07-17
 
 ## Goal
 
-Verify that the GitHub-installed WinSight skill is automatically discovered and usable from a new Codex task without relying on this conversation.
+Add real native capture alternatives for windows that return black or incomplete PrintWindow frames, while preserving correct monitor, DPI, crop, and recovery behavior on Windows 10 build 19045.
 
 ## In scope
 
-- Start a new Codex task
-- Ask it to use WinSight to capture the WeChat developer tool or another chosen app
-- Confirm that it discovers the installed skill and returns a valid image/evidence
-- Record the user's explicit acceptance or failure details in M04
+- Add a Windows Graphics Capture backend that does not call unsupported optional APIs
+- Add a DXGI Desktop Duplication fallback with monitor-aware window cropping
+- Handle minimized, occluded, black-frame, device-loss, and window-recreation outcomes explicitly
+- Preserve capture metadata and backend-attempt evidence through the MCP response
+- Add deterministic backend-selection and real-window validation
 
 ## Not in scope
 
-- Further publication or installation work already archived for `WS-002`
-- WGC native frame implementation (`WS-003`)
-- DXGI Desktop Duplication (`WS-004`)
-- MCP image server (`WS-005`)
-- Input automation or security-policy changes
+- Continuous tracking, recording, OCR, and material-change scoring (`WS-005`)
+- Authentication, protected-content bypass, process injection, or private capture hooks
+- Authentication, CAPTCHA, password, permission, payment, or Windows security UI automation
 
 ## Done when
 
-- A new task automatically discovers WinSight
-- The task captures the requested window with valid non-black evidence
-- The user explicitly marks M04 accepted or provides reproducible failure details
+- WGC captures a real target on build 19045 without touching `IsBorderRequired`
+- DXGI can crop the correct target from the owning monitor when the target is visible
+- `auto` records every attempted backend and chooses the first valid non-black frame
+- Device loss and unsupported/minimized states return explicit recoverable errors
+- MCP, skill, plugin, project-doc, and real-window tests pass
 
 ## Next concrete action
 
-User starts a new task and asks: “使用 WinSight 捕获微信开发者工具窗口，并告诉我采用了哪个后端。”
+Inventory the available Windows SDK/runtime and FFmpeg/DXGI capabilities, then choose the smallest maintainable native helper architecture before editing capture code.
