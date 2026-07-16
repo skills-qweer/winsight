@@ -1,0 +1,23 @@
+{
+  "name": "winsight",
+  "version": "0.1.0",
+  "description": "Reliable multi-backend Windows window capture for Codex.",
+  "author": {
+    "name": "skills-qweer",
+    "url": "https://github.com/skills-qweer"
+  },
+  "homepage": "https://github.com/skills-qweer/winsight",
+  "repository": "https://github.com/skills-qweer/winsight",
+  "license": "MIT",
+  "keywords": ["windows", "capture", "screenshot", "wgc", "dxgi", "printwindow"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "WinSight",
+    "shortDescription": "Capture Windows apps when normal screenshots fail.",
+    "longDescription": "WinSight gives Codex reliable Windows window discovery, capture diagnostics, black-frame detection, and automatic capture-backend fallback.",
+    "developerName": "WinSight contributors",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "defaultPrompt": "Use WinSight to inspect and capture the Windows app I am working with."
+  }
+}

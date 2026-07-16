@@ -1,0 +1,10 @@
+*.png
+!assets/*.png
+.DS_Store
+Thumbs.db
+bin/
+obj/
+.vs/
+*.user
+*.suo
+node_modules/

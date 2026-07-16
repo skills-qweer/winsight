@@ -1,0 +1,4 @@
+interface:
+  display_name: "WinSight"
+  short_description: "Capture Windows apps when normal screenshots fail"
+  default_prompt: "Use WinSight to capture and inspect the Windows app I am working with."
