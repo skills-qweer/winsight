@@ -85,6 +85,33 @@ public static class WinSightNative
         public string Error { get; set; }
     }
 
+    public sealed class ChangeInfo
+    {
+        public bool Success { get; set; }
+        public string Error { get; set; }
+        public int BeforeWidth { get; set; }
+        public int BeforeHeight { get; set; }
+        public int AfterWidth { get; set; }
+        public int AfterHeight { get; set; }
+        public bool DimensionsChanged { get; set; }
+        public double MeanAbsoluteRgb { get; set; }
+        public double ChangedFraction { get; set; }
+        public double Score { get; set; }
+        public int SampleCount { get; set; }
+        public int PixelThreshold { get; set; }
+    }
+
+    public sealed class CropInfo
+    {
+        public bool Success { get; set; }
+        public string Error { get; set; }
+        public string OutputPath { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+    }
+
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -329,6 +356,87 @@ public static class WinSightNative
         catch (Exception exception)
         {
             return Failure(backend, outputPath, exception.Message);
+        }
+    }
+
+    public static CropInfo CropImageFile(string inputPath, string outputPath, int x, int y, int width, int height)
+    {
+        try
+        {
+            using (Bitmap source = new Bitmap(inputPath))
+            {
+                if (x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > source.Width || y + height > source.Height)
+                {
+                    return new CropInfo { Success = false, Error = "Crop rectangle is outside the source image." };
+                }
+                using (Bitmap cropped = source.Clone(new Rectangle(x, y, width, height), PixelFormat.Format32bppArgb))
+                {
+                    cropped.Save(outputPath, ImageFormat.Png);
+                }
+            }
+            return new CropInfo { Success = true, OutputPath = outputPath, X = x, Y = y, Width = width, Height = height };
+        }
+        catch (Exception exception)
+        {
+            return new CropInfo { Success = false, Error = exception.Message, OutputPath = outputPath };
+        }
+    }
+
+    public static ChangeInfo CompareImageFiles(string beforePath, string afterPath, int pixelThreshold)
+    {
+        try
+        {
+            using (Bitmap before = new Bitmap(beforePath))
+            using (Bitmap after = new Bitmap(afterPath))
+            {
+                int gridWidth = Math.Min(96, Math.Max(1, Math.Min(before.Width, after.Width)));
+                int gridHeight = Math.Min(96, Math.Max(1, Math.Min(before.Height, after.Height)));
+                double totalDifference = 0;
+                int changed = 0;
+                int samples = 0;
+                int threshold = Math.Max(0, Math.Min(255, pixelThreshold));
+
+                for (int gridY = 0; gridY < gridHeight; gridY++)
+                {
+                    int beforeY = Math.Min(before.Height - 1, (int)((gridY + 0.5) * before.Height / gridHeight));
+                    int afterY = Math.Min(after.Height - 1, (int)((gridY + 0.5) * after.Height / gridHeight));
+                    for (int gridX = 0; gridX < gridWidth; gridX++)
+                    {
+                        int beforeX = Math.Min(before.Width - 1, (int)((gridX + 0.5) * before.Width / gridWidth));
+                        int afterX = Math.Min(after.Width - 1, (int)((gridX + 0.5) * after.Width / gridWidth));
+                        Color left = before.GetPixel(beforeX, beforeY);
+                        Color right = after.GetPixel(afterX, afterY);
+                        double difference = (Math.Abs(left.R - right.R) + Math.Abs(left.G - right.G) + Math.Abs(left.B - right.B)) / 3.0;
+                        totalDifference += difference;
+                        if (difference >= threshold) changed++;
+                        samples++;
+                    }
+                }
+
+                double mean = samples == 0 ? 0 : totalDifference / samples;
+                double fraction = samples == 0 ? 0 : (double)changed / samples;
+                bool dimensionsChanged = before.Width != after.Width || before.Height != after.Height;
+                double score = 0.35 * (mean / 255.0) + 0.65 * fraction;
+                if (dimensionsChanged) score = Math.Max(score, 0.25);
+                return new ChangeInfo
+                {
+                    Success = true,
+                    BeforeWidth = before.Width,
+                    BeforeHeight = before.Height,
+                    AfterWidth = after.Width,
+                    AfterHeight = after.Height,
+                    DimensionsChanged = dimensionsChanged,
+                    MeanAbsoluteRgb = Math.Round(mean, 4),
+                    ChangedFraction = Math.Round(fraction, 6),
+                    Score = Math.Round(Math.Min(1.0, score), 6),
+                    SampleCount = samples,
+                    PixelThreshold = threshold
+                };
+            }
+        }
+        catch (Exception exception)
+        {
+            return new ChangeInfo { Success = false, Error = exception.Message, PixelThreshold = pixelThreshold };
         }
     }
 

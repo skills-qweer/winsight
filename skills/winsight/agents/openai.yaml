@@ -1,4 +1,4 @@
 interface:
   display_name: "WinSight"
-  short_description: "See and safely operate Windows apps when capture fails"
-  default_prompt: "Use WinSight to capture this Windows app, map the target, and perform a safe local interaction."
+  short_description: "See, track, read, and safely operate Windows apps"
+  default_prompt: "Use WinSight to capture, track, OCR, or safely operate this Windows app."

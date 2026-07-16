@@ -23,11 +23,15 @@
 | Controlled input handshake | AUTO_VERIFIED | Benign game click visibly advanced to Chapter 1; guards passed |
 | DPI/client coordinate mapping | AUTO_VERIFIED | Window/client/normalized/logical mappings tested at DPI 96 |
 | WGC and DXGI backends | AUTO_VERIFIED | WGC and DXGI returned exact target-sized non-black frames |
-| Tracking, change detection, recording, OCR | IN_PROGRESS | `WS-005` |
+| Window tracking | AUTO_VERIFIED | Isolated fixture move/resize and client-bound changes detected |
+| Material-change detection | AUTO_VERIFIED | Stable score 0; changed same-size game ROI score 0.059552 |
+| ROI and bounded recording | AUTO_VERIFIED | 453x967 mapping plus duration/frame/byte-bounded manifest test passed |
+| Local OCR | AUTO_VERIFIED | Windows.Media.Ocr `zh-Hans-CN`, 8 ROI lines and word boxes |
+| v0.4 publication and installation | IN_PROGRESS | Final WS-005 step |
 
 ## Next action
 
-Inventory built-in OCR options and implement the bounded observation-session primitives for WS-005.
+Run the full v0.4 regression suite, push the release commit, and refresh the personal plugin and standalone skill installations.
 
 ## User involvement
 

@@ -11,10 +11,15 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const SCRIPT_ROOT = path.join(ROOT, "skills", "winsight", "scripts");
 const CAPTURE_SCRIPT = path.join(SCRIPT_ROOT, "winsight.ps1");
 const INPUT_SCRIPT = path.join(SCRIPT_ROOT, "input.ps1");
+const ANALYSIS_SCRIPT = path.join(SCRIPT_ROOT, "analysis.ps1");
+const OCR_SCRIPT = path.join(SCRIPT_ROOT, "ocr.ps1");
 const SERVER_NAME = "WinSight MCP";
-const SERVER_VERSION = "0.3.0";
+const SERVER_VERSION = "0.4.0";
 const TOKEN_TTL_MS = 30_000;
 const preparedInputs = new Map();
+const observationSessions = new Map();
+const OBSERVATION_TTL_MS = 10 * 60_000;
+const MAX_OBSERVATION_SESSIONS = 16;
 let inputEnabled = true;
 
 const JsonRpcError = {
@@ -68,6 +73,13 @@ function cleanupTokens() {
   for (const [token, prepared] of preparedInputs) {
     if (prepared.used || prepared.expiresAt <= now) preparedInputs.delete(token);
   }
+  for (const [sessionId, session] of observationSessions) {
+    if (session.expiresAt <= now) observationSessions.delete(sessionId);
+  }
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function runPowerShell(script, args = []) {
@@ -84,7 +96,11 @@ async function runPowerShell(script, args = []) {
   );
   const trimmed = stdout.trim();
   if (!trimmed) throw new Error(`PowerShell script returned no JSON: ${path.basename(script)}`);
-  return JSON.parse(trimmed);
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(`PowerShell script returned invalid JSON (${path.basename(script)}): ${error instanceof Error ? error.message : String(error)}; prefix=${JSON.stringify(trimmed.slice(0, 500))}`);
+  }
 }
 
 function normalizeWindowList(value) {
@@ -189,6 +205,71 @@ function mapCoordinates(window, args) {
   };
 }
 
+function mapRegion(window, args) {
+  const area = args.area ?? "window";
+  if (!["window", "client"].includes(area)) throw new Error("area must be window or client.");
+  const coordinateSpace = args.coordinateSpace ?? "window_pixels";
+  const rect = rectFor(window, area);
+  const x = requireNumber(args.x, "x");
+  const y = requireNumber(args.y, "y");
+  const width = requireNumber(args.width, "width");
+  const height = requireNumber(args.height, "height");
+  let pixelX;
+  let pixelY;
+  let pixelWidth;
+  let pixelHeight;
+
+  if (coordinateSpace === "window_pixels" || coordinateSpace === "client_pixels") {
+    pixelX = x;
+    pixelY = y;
+    pixelWidth = width;
+    pixelHeight = height;
+  } else if (coordinateSpace === "normalized") {
+    if ([x, y, width, height].some((value) => value < 0 || value > 1) || x + width > 1 || y + height > 1) {
+      throw new Error("Normalized region values must be between 0 and 1 and remain inside the selected area.");
+    }
+    pixelX = x * rect.width;
+    pixelY = y * rect.height;
+    pixelWidth = width * rect.width;
+    pixelHeight = height * rect.height;
+  } else if (coordinateSpace === "logical") {
+    const logicalWidth = requireNumber(args.logicalWidth, "logicalWidth");
+    const logicalHeight = requireNumber(args.logicalHeight, "logicalHeight");
+    if (logicalWidth <= 0 || logicalHeight <= 0) throw new Error("Logical dimensions must be positive.");
+    pixelX = (x / logicalWidth) * rect.width;
+    pixelY = (y / logicalHeight) * rect.height;
+    pixelWidth = (width / logicalWidth) * rect.width;
+    pixelHeight = (height / logicalHeight) * rect.height;
+  } else {
+    throw new Error("coordinateSpace must be window_pixels, client_pixels, normalized, or logical.");
+  }
+
+  const left = Math.round(pixelX);
+  const top = Math.round(pixelY);
+  const right = Math.round(pixelX + pixelWidth);
+  const bottom = Math.round(pixelY + pixelHeight);
+  if (left < 0 || top < 0 || right > rect.width || bottom > rect.height || right <= left || bottom <= top) {
+    throw new Error("Mapped region is empty or outside the selected area.");
+  }
+  const screen = { x: rect.x + left, y: rect.y + top, width: right - left, height: bottom - top };
+  return {
+    area,
+    coordinateSpace,
+    source: { x, y, width, height, logicalWidth: args.logicalWidth ?? null, logicalHeight: args.logicalHeight ?? null },
+    areaBounds: rect,
+    areaPixels: { x: left, y: top, width: right - left, height: bottom - top },
+    screen,
+    capturePixels: {
+      x: screen.x - window.bounds.x,
+      y: screen.y - window.bounds.y,
+      width: screen.width,
+      height: screen.height,
+    },
+    dpi: window.dpi ?? 96,
+    dpiScale: window.dpiScale ?? 1,
+  };
+}
+
 async function captureWindow(window, backend = "auto") {
   const outputDir = path.join(os.tmpdir(), "winsight-mcp");
   await fs.mkdir(outputDir, { recursive: true });
@@ -205,7 +286,52 @@ async function captureWindow(window, backend = "auto") {
   if (!success || black) {
     throw new Error(`Capture did not produce a valid frame: ${selected.Error ?? selected.error ?? "black frame"}`);
   }
-  return { result, outputPath, pngBytes: await fs.readFile(outputPath) };
+  return { window: result.target ?? window, result, outputPath, pngBytes: await fs.readFile(outputPath) };
+}
+
+async function cropCapture(window, captured, regionArgs) {
+  const mappingWindow = captured.window ?? window;
+  const mapping = mapRegion(mappingWindow, regionArgs);
+  const outputPath = path.join(os.tmpdir(), "winsight-mcp", `region-${crypto.randomUUID()}.png`);
+  const crop = await runPowerShell(ANALYSIS_SCRIPT, [
+    "-Action", "crop",
+    "-ImagePath", captured.outputPath,
+    "-Output", outputPath,
+    "-X", mapping.capturePixels.x,
+    "-Y", mapping.capturePixels.y,
+    "-Width", mapping.capturePixels.width,
+    "-Height", mapping.capturePixels.height,
+  ]);
+  if (!(crop.Success ?? crop.success)) throw new Error(`Region crop failed: ${crop.Error ?? crop.error}`);
+  return { ...captured, window: mappingWindow, outputPath, pngBytes: await fs.readFile(outputPath), mapping, crop };
+}
+
+async function captureObservation(window, backend, regionArgs) {
+  const captured = await captureWindow(window, backend);
+  return regionArgs ? cropCapture(window, captured, regionArgs) : captured;
+}
+
+async function compareImagePaths(beforePath, afterPath, pixelThreshold = 16) {
+  const result = await runPowerShell(ANALYSIS_SCRIPT, [
+    "-Action", "compare",
+    "-ImagePath", beforePath,
+    "-Other", afterPath,
+    "-PixelThreshold", pixelThreshold,
+  ]);
+  if (!(result.Success ?? result.success)) throw new Error(`Frame comparison failed: ${result.Error ?? result.error}`);
+  return result;
+}
+
+async function runOcr(imagePath) {
+  const result = await runPowerShell(OCR_SCRIPT, ["-ImagePath", imagePath]);
+  if (typeof result.text === "string" && result.text.length > 50_000) {
+    result.text = `${result.text.slice(0, 50_000)}\n[truncated]`;
+  }
+  if (Array.isArray(result.lines) && result.lines.length > 500) {
+    result.lines = result.lines.slice(0, 500);
+    result.linesTruncated = true;
+  }
+  return result;
 }
 
 function windowFingerprint(window) {
@@ -226,6 +352,47 @@ function selectorSchema() {
     title: { type: "string", description: "Case-insensitive title substring. Must match exactly one window." },
     process: { type: "string", description: "Case-insensitive process substring. Must match exactly one window." },
   };
+}
+
+function backendSchema() {
+  return { type: "string", enum: ["auto", "wgc", "printwindow", "dxgi", "gdi-screen"], default: "auto" };
+}
+
+function regionSchema() {
+  return {
+    area: { type: "string", enum: ["window", "client"], default: "window" },
+    coordinateSpace: { type: "string", enum: ["window_pixels", "client_pixels", "normalized", "logical"], default: "window_pixels" },
+    x: { type: "number" },
+    y: { type: "number" },
+    width: { type: "number" },
+    height: { type: "number" },
+    logicalWidth: { type: "number" },
+    logicalHeight: { type: "number" },
+  };
+}
+
+function windowChanges(previous, current, recreated = false) {
+  const changes = [];
+  if (recreated || Number(previous.hwnd) !== Number(current.hwnd)) changes.push("hwnd_recreated");
+  if (Number(previous.processId) !== Number(current.processId)) changes.push("process_changed");
+  if (previous.title !== current.title) changes.push("title_changed");
+  if (JSON.stringify(previous.bounds) !== JSON.stringify(current.bounds)) changes.push("window_moved_or_resized");
+  if (JSON.stringify(previous.clientBounds) !== JSON.stringify(current.clientBounds)) changes.push("client_moved_or_resized");
+  if (Number(previous.dpi) !== Number(current.dpi)) changes.push("dpi_changed");
+  if (Boolean(previous.visible) !== Boolean(current.visible)) changes.push("visibility_changed");
+  if (Boolean(previous.minimized) !== Boolean(current.minimized)) changes.push("minimized_changed");
+  return changes;
+}
+
+async function resolveTrackedWindow(session) {
+  const windows = await listWindows();
+  const exact = windows.filter((window) => Number(window.hwnd) === Number(session.lastWindow.hwnd));
+  if (exact.length === 1) return { window: exact[0], recreated: false };
+  const candidates = windows.filter((window) =>
+    String(window.process ?? "").toLocaleLowerCase() === String(session.lastWindow.process ?? "").toLocaleLowerCase()
+    && String(window.title ?? "") === String(session.lastWindow.title ?? ""));
+  if (candidates.length === 1) return { window: candidates[0], recreated: true };
+  throw new Error(`Tracked window is unavailable; found ${candidates.length} recreation candidates.`);
 }
 
 const tools = [
@@ -254,7 +421,7 @@ const tools = [
       type: "object",
       properties: {
         ...selectorSchema(),
-        backend: { type: "string", enum: ["auto", "wgc", "printwindow", "dxgi", "gdi-screen"], default: "auto" },
+        backend: backendSchema(),
       },
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -275,6 +442,89 @@ const tools = [
         logicalHeight: { type: "number" },
       },
       required: ["x", "y"],
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "capture_region",
+    title: "Capture Windows Window Region",
+    description: "Capture a mapped window/client region and return its PNG plus source, screen, and capture-pixel coordinates.",
+    inputSchema: {
+      type: "object",
+      properties: { ...selectorSchema(), backend: backendSchema(), ...regionSchema() },
+      required: ["x", "y", "width", "height"],
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "start_observation",
+    title: "Start Bounded Window Observation",
+    description: "Capture a baseline and start a ten-minute bounded session for window continuity and visual-change polling.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...selectorSchema(),
+        backend: backendSchema(),
+        threshold: { type: "number", minimum: 0, maximum: 1, default: 0.05 },
+        pixelThreshold: { type: "integer", minimum: 0, maximum: 255, default: 16 },
+        region: { type: "object", properties: regionSchema(), required: ["x", "y", "width", "height"] },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "poll_observation",
+    title: "Poll Window Observation",
+    description: "Revalidate a tracked window, capture the next frame, and report identity/bounds changes plus a material-change score.",
+    inputSchema: {
+      type: "object",
+      properties: { sessionId: { type: "string" } },
+      required: ["sessionId"],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "stop_observation",
+    title: "Stop Window Observation",
+    description: "Stop one bounded observation session and release its in-memory state.",
+    inputSchema: {
+      type: "object",
+      properties: { sessionId: { type: "string" } },
+      required: ["sessionId"],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "record_window",
+    title: "Record Bounded Window Frames",
+    description: "Record a bounded multi-backend frame sequence in local temporary storage with a JSON manifest and per-frame change evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...selectorSchema(),
+        backend: backendSchema(),
+        durationMs: { type: "integer", minimum: 100, maximum: 60000, default: 5000 },
+        intervalMs: { type: "integer", minimum: 100, maximum: 10000, default: 500 },
+        maxFrames: { type: "integer", minimum: 1, maximum: 600, default: 120 },
+        maxBytes: { type: "integer", minimum: 1048576, maximum: 268435456, default: 67108864 },
+        threshold: { type: "number", minimum: 0, maximum: 1, default: 0.05 },
+        pixelThreshold: { type: "integer", minimum: 0, maximum: 255, default: 16 },
+        region: { type: "object", properties: regionSchema(), required: ["x", "y", "width", "height"] },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "ocr_window",
+    title: "OCR Windows Window",
+    description: "Capture a full window or mapped region and recognize visible text locally with Windows.Media.Ocr.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...selectorSchema(),
+        backend: backendSchema(),
+        region: { type: "object", properties: regionSchema(), required: ["x", "y", "width", "height"] },
+      },
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -348,9 +598,9 @@ async function handleToolCall(name, args) {
     const captured = await captureWindow(window, args.backend ?? "auto");
     const selected = captured.result.selected;
     return imageResult(
-      `Captured ${window.title} with ${selected.Backend ?? selected.backend}.`,
+      `Captured ${captured.window.title} with ${selected.Backend ?? selected.backend}.`,
       captured.pngBytes,
-      { window, selected, attempts: captured.result.attempts },
+      { window: captured.window, selected, attempts: captured.result.attempts },
     );
   }
 
@@ -360,9 +610,207 @@ async function handleToolCall(name, args) {
     return textResult(JSON.stringify({ window, mapping }, null, 2), { window, mapping });
   }
 
-  if (name === "prepare_input") {
-    if (!inputEnabled) throw new Error("WinSight input is stopped. Call resume_input and obtain confirmation first.");
+  if (name === "capture_region") {
     const window = await resolveWindow(args);
+    const captured = await captureWindow(window, args.backend ?? "auto");
+    const region = await cropCapture(window, captured, args);
+    return imageResult(
+      `Captured region ${region.mapping.capturePixels.width}x${region.mapping.capturePixels.height} from ${window.title}.`,
+      region.pngBytes,
+      { window: region.window, mapping: region.mapping, selected: captured.result.selected, attempts: captured.result.attempts },
+    );
+  }
+
+  if (name === "start_observation") {
+    if (observationSessions.size >= MAX_OBSERVATION_SESSIONS) {
+      throw new Error(`At most ${MAX_OBSERVATION_SESSIONS} observation sessions may be active.`);
+    }
+    const window = await resolveWindow(args);
+    const threshold = args.threshold ?? 0.05;
+    const pixelThreshold = args.pixelThreshold ?? 16;
+    if (typeof threshold !== "number" || threshold < 0 || threshold > 1) throw new Error("threshold must be between 0 and 1.");
+    if (!Number.isInteger(pixelThreshold) || pixelThreshold < 0 || pixelThreshold > 255) throw new Error("pixelThreshold must be an integer from 0 to 255.");
+    const baseline = await captureObservation(window, args.backend ?? "auto", args.region);
+    const sessionId = crypto.randomUUID();
+    const baselineWindow = baseline.window ?? window;
+    const session = {
+      sessionId,
+      backend: args.backend ?? "auto",
+      region: args.region ?? null,
+      threshold,
+      pixelThreshold,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + OBSERVATION_TTL_MS,
+      lastWindow: baselineWindow,
+      lastPath: baseline.outputPath,
+      pollCount: 0,
+    };
+    observationSessions.set(sessionId, session);
+    return imageResult(
+      `Started bounded observation for ${baselineWindow.title}. Session expires after ten minutes of inactivity.`,
+      baseline.pngBytes,
+      { sessionId, expiresAt: new Date(session.expiresAt).toISOString(), window: baselineWindow, region: baseline.mapping ?? null, threshold, pixelThreshold },
+    );
+  }
+
+  if (name === "poll_observation") {
+    const sessionId = String(args.sessionId ?? "");
+    const session = observationSessions.get(sessionId);
+    if (!session) throw new Error("Observation session is missing or expired.");
+    const resolved = await resolveTrackedWindow(session);
+    const current = await captureObservation(resolved.window, session.backend, session.region);
+    const currentWindow = current.window ?? resolved.window;
+    const changes = windowChanges(session.lastWindow, currentWindow, resolved.recreated);
+    const comparison = await compareImagePaths(session.lastPath, current.outputPath, session.pixelThreshold);
+    const score = Number(comparison.Score ?? comparison.score ?? 0);
+    session.lastWindow = currentWindow;
+    session.lastPath = current.outputPath;
+    session.pollCount += 1;
+    session.expiresAt = Date.now() + OBSERVATION_TTL_MS;
+    return imageResult(
+      `Polled ${currentWindow.title}: visual score ${score.toFixed(6)}, ${changes.length} window-state changes.`,
+      current.pngBytes,
+      {
+        sessionId,
+        pollCount: session.pollCount,
+        expiresAt: new Date(session.expiresAt).toISOString(),
+        window: currentWindow,
+        changes,
+        continuityChanged: changes.length > 0,
+        comparison,
+        threshold: session.threshold,
+        materialChanged: score >= session.threshold,
+        region: current.mapping ?? null,
+        selected: current.result.selected,
+      },
+    );
+  }
+
+  if (name === "stop_observation") {
+    const sessionId = String(args.sessionId ?? "");
+    const existed = observationSessions.delete(sessionId);
+    return textResult(existed ? "Observation session stopped." : "Observation session was already absent.", { sessionId, stopped: existed });
+  }
+
+  if (name === "record_window") {
+    const initialWindow = await resolveWindow(args);
+    const durationMs = args.durationMs ?? 5000;
+    const intervalMs = args.intervalMs ?? 500;
+    const maxFrames = args.maxFrames ?? 120;
+    const maxBytes = args.maxBytes ?? 64 * 1024 * 1024;
+    const threshold = args.threshold ?? 0.05;
+    const pixelThreshold = args.pixelThreshold ?? 16;
+    if (!Number.isInteger(durationMs) || durationMs < 100 || durationMs > 60_000) throw new Error("durationMs must be an integer from 100 to 60000.");
+    if (!Number.isInteger(intervalMs) || intervalMs < 100 || intervalMs > 10_000) throw new Error("intervalMs must be an integer from 100 to 10000.");
+    if (!Number.isInteger(maxFrames) || maxFrames < 1 || maxFrames > 600) throw new Error("maxFrames must be an integer from 1 to 600.");
+    if (!Number.isInteger(maxBytes) || maxBytes < 1024 * 1024 || maxBytes > 256 * 1024 * 1024) throw new Error("maxBytes must be from 1 MiB to 256 MiB.");
+    if (typeof threshold !== "number" || threshold < 0 || threshold > 1) throw new Error("threshold must be between 0 and 1.");
+    if (!Number.isInteger(pixelThreshold) || pixelThreshold < 0 || pixelThreshold > 255) throw new Error("pixelThreshold must be an integer from 0 to 255.");
+
+    const recordingId = crypto.randomUUID();
+    const directory = path.join(os.tmpdir(), "winsight-recordings", recordingId);
+    await fs.mkdir(directory, { recursive: true });
+    const startedAt = Date.now();
+    let nextDue = startedAt;
+    let totalBytes = 0;
+    let previousPath = null;
+    let lastPngBytes = null;
+    let stopReason = "duration";
+    const frames = [];
+    const tracking = { lastWindow: initialWindow };
+
+    while (frames.length < maxFrames) {
+      if (frames.length > 0 && Date.now() - startedAt >= durationMs) break;
+      const waitMs = nextDue - Date.now();
+      if (waitMs > 0) await delay(waitMs);
+      let resolved;
+      try {
+        resolved = frames.length === 0 ? { window: initialWindow, recreated: false } : await resolveTrackedWindow(tracking);
+      } catch (error) {
+        stopReason = `window_unavailable: ${error instanceof Error ? error.message : String(error)}`;
+        break;
+      }
+      const captured = await captureObservation(resolved.window, args.backend ?? "auto", args.region);
+      const capturedWindow = captured.window ?? resolved.window;
+      const changes = windowChanges(tracking.lastWindow, capturedWindow, resolved.recreated);
+      const stat = await fs.stat(captured.outputPath);
+      if (totalBytes + stat.size > maxBytes) {
+        stopReason = "max_bytes";
+        break;
+      }
+      const framePath = path.join(directory, `frame-${String(frames.length).padStart(4, "0")}.png`);
+      await fs.copyFile(captured.outputPath, framePath);
+      const comparison = previousPath ? await compareImagePaths(previousPath, framePath, pixelThreshold) : null;
+      const score = Number(comparison?.Score ?? comparison?.score ?? 0);
+      const selected = captured.result.selected;
+      frames.push({
+        index: frames.length,
+        elapsedMs: Date.now() - startedAt,
+        timestamp: new Date().toISOString(),
+        file: framePath,
+        bytes: stat.size,
+        backend: selected.Backend ?? selected.backend,
+        attempts: captured.result.attempts,
+        window: capturedWindow,
+        changes,
+        comparison,
+        materialChanged: comparison ? score >= threshold : false,
+        region: captured.mapping ?? null,
+      });
+      totalBytes += stat.size;
+      previousPath = framePath;
+      lastPngBytes = captured.pngBytes;
+      tracking.lastWindow = capturedWindow;
+      nextDue += intervalMs;
+    }
+
+    if (frames.length >= maxFrames) stopReason = "max_frames";
+    if (frames.length === 0 || !lastPngBytes) throw new Error(`Recording produced no retained frames (${stopReason}).`);
+    const manifest = {
+      recordingId,
+      createdAt: new Date(startedAt).toISOString(),
+      finishedAt: new Date().toISOString(),
+      requested: { durationMs, intervalMs, maxFrames, maxBytes, backend: args.backend ?? "auto", threshold, pixelThreshold, region: args.region ?? null },
+      stopReason,
+      frameCount: frames.length,
+      totalBytes,
+      frames,
+    };
+    const manifestPath = path.join(directory, "manifest.json");
+    await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    return imageResult(
+      `Recorded ${frames.length} bounded frames (${totalBytes} bytes); stopped by ${stopReason}.`,
+      lastPngBytes,
+      {
+        recordingId,
+        directory,
+        manifestPath,
+        stopReason,
+        frameCount: frames.length,
+        totalBytes,
+        frames: frames.slice(-100),
+        framesTruncated: frames.length > 100,
+      },
+    );
+  }
+
+  if (name === "ocr_window") {
+    const window = await resolveWindow(args);
+    const captured = await captureObservation(window, args.backend ?? "auto", args.region);
+    const ocr = await runOcr(captured.outputPath);
+    return imageResult(
+      ocr.success ? `Recognized ${ocr.lines?.length ?? 0} text lines in ${window.title}.` : `OCR provider unavailable or failed: ${ocr.error}`,
+      captured.pngBytes,
+      { window: captured.window ?? window, region: captured.mapping ?? null, selected: captured.result.selected, ocr },
+    );
+  }
+
+  if (name === "prepare_input") {
+    if (!inputEnabled) throw new Error("WinSight input is stopped. Call resume_input first.");
+    const resolvedWindow = await resolveWindow(args);
+    assertInputSurfaceAllowed(resolvedWindow);
+    const captured = await captureWindow(resolvedWindow, "auto");
+    const window = captured.window ?? resolvedWindow;
     assertInputSurfaceAllowed(window);
     let action;
     if (args.action === "click") {
@@ -375,7 +823,6 @@ async function handleToolCall(name, args) {
       throw new Error("action must be click or key.");
     }
 
-    const captured = await captureWindow(window, "auto");
     const token = crypto.randomUUID();
     const prepared = {
       token,

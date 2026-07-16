@@ -28,6 +28,15 @@ Version 0.3 adds native multi-backend capture:
 
 The WGC helper builds into the user's local app-data cache. If Windows SDK contract metadata is absent, first use downloads the pinned Microsoft `Microsoft.Windows.SDK.Contracts` 10.0.19041.2 package from NuGet and verifies its SHA-256 before compiling; later captures run offline.
 
+Version 0.4 adds a bounded observation layer:
+
+- stable HWND/process/title/bounds/client/DPI tracking with recreation, move, resize, visibility, and minimized-state reporting;
+- normalized material-change scoring with dimension-change detection and configurable thresholds;
+- window/client/normalized/logical region capture with capture-to-screen coordinate metadata;
+- time/frame/byte-bounded local frame recording plus JSON manifests and per-frame backend/change evidence;
+- local `Windows.Media.Ocr` recognition with language, text, line, word, and bounding-box results;
+- 14 MCP tools covering observation, ROI, tracking, recording, OCR, coordinate mapping, and controlled input.
+
 The implementation is independent and uses public Windows APIs. It does not copy proprietary code from streaming applications.
 
 ## Quick test
@@ -41,10 +50,10 @@ node .\scripts\test_mcp.mjs
 
 ## Roadmap
 
-- continuous D3D11 frame sessions and stale-frame detection;
-- window tracking and material-change scoring;
-- bounded frame recording and region-of-interest capture;
-- OCR and visual-change monitoring as optional higher layers.
+- persistent GPU frame sessions for higher-frequency recording;
+- rotation-aware, multi-adapter DXGI mapping for windows spanning displays;
+- optional OCR-provider plugins with confidence scores;
+- long-running monitoring orchestration outside the bounded MCP session.
 
 WinSight intentionally excludes DRM bypass, authentication automation, security-setting changes, and hidden process injection.
 

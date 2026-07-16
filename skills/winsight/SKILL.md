@@ -25,6 +25,14 @@ Call `map_coordinates` with one of:
 
 Check the returned screen, capture-pixel, bounds, DPI, and scale metadata. Re-map after a move, resize, DPI change, title change, or window recreation.
 
+## Observe changes and text
+
+- Use `capture_region` for a window/client ROI. Prefer normalized regions when the app may resize.
+- Use `start_observation`, then `poll_observation`, for bounded continuity and material-change checks. Stop with `stop_observation`; inactive sessions expire after ten minutes.
+- Treat `changes` (HWND/title/bounds/DPI state) separately from `comparison.Score` (pixels). The default material threshold is 0.05.
+- Use `record_window` for short evidence sequences. It enforces duration, frame-count, and byte limits and writes a local JSON manifest.
+- Use `ocr_window` for full-frame or ROI text. OCR runs locally through `Windows.Media.Ocr`; it returns word bounds but this provider does not expose confidence scores.
+
 ## Operate a safe local app
 
 1. Call `prepare_input` with an exact HWND and a click or allowlisted key.
@@ -67,6 +75,8 @@ Run:
 
 ```powershell
 node scripts/test_mcp.mjs
+node scripts/test_observation.mjs
+node scripts/test_tracking_move.mjs
 python scripts/check_project_docs.py
 ```
 

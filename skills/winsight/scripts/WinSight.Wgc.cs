@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -149,6 +150,9 @@ internal static class WinSightWgc
         Direct3D11CaptureFrame capturedFrame = null;
         ManualResetEventSlim frameReady = new ManualResetEventSlim(false);
         TypedEventHandler<Direct3D11CaptureFramePool, object> frameArrived = null;
+        int mismatchedFrames = 0;
+        int lastMismatchWidth = 0;
+        int lastMismatchHeight = 0;
 
         try
         {
@@ -163,6 +167,9 @@ internal static class WinSightWgc
                 if (frame == null) return;
                 if (frame.ContentSize.Width != item.Size.Width || frame.ContentSize.Height != item.Size.Height)
                 {
+                    lastMismatchWidth = frame.ContentSize.Width;
+                    lastMismatchHeight = frame.ContentSize.Height;
+                    Interlocked.Increment(ref mismatchedFrames);
                     frame.Dispose();
                     return;
                 }
@@ -178,9 +185,19 @@ internal static class WinSightWgc
             framePool.FrameArrived += frameArrived;
             session = framePool.CreateCaptureSession(item);
             session.StartCapture();
-            if (!frameReady.Wait(TimeSpan.FromSeconds(8)))
+            Stopwatch wait = Stopwatch.StartNew();
+            while (!frameReady.Wait(200))
             {
-                throw new TimeoutException("WGC did not produce a frame within 8 seconds.");
+                if (Volatile.Read(ref mismatchedFrames) > 0 && wait.Elapsed >= TimeSpan.FromSeconds(2))
+                {
+                    throw new InvalidOperationException(
+                        "WGC content size " + lastMismatchWidth + "x" + lastMismatchHeight
+                        + " did not converge to the window capture size " + item.Size.Width + "x" + item.Size.Height + ".");
+                }
+                if (wait.Elapsed >= TimeSpan.FromSeconds(8))
+                {
+                    throw new TimeoutException("WGC did not produce a frame within 8 seconds.");
+                }
             }
             SaveSurface(capturedFrame.Surface, outputPath);
         }

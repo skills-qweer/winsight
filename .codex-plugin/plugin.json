@@ -1,7 +1,7 @@
 {
   "name": "winsight",
-  "version": "0.3.0",
-  "description": "Reliable Windows window capture, coordinate mapping, and controlled local input for Codex.",
+  "version": "0.4.0",
+  "description": "Reliable Windows capture, tracking, OCR, bounded recording, coordinate mapping, and controlled local input for Codex.",
   "author": {
     "name": "skills-qweer",
     "url": "https://github.com/skills-qweer"
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "WinSight",
     "shortDescription": "See and safely operate Windows apps when capture fails.",
-    "longDescription": "WinSight gives Codex reliable Windows window discovery, direct image capture, DPI-aware coordinate mapping, black-frame detection, and prepared controlled input for safe local app surfaces.",
+    "longDescription": "WinSight gives Codex reliable Windows window discovery, multi-backend image capture, tracking, material-change detection, bounded recording, local OCR, DPI-aware coordinate mapping, and prepared controlled input for safe local app surfaces.",
     "developerName": "WinSight contributors",
     "category": "Productivity",
     "capabilities": ["Interactive", "Read", "Write"],
