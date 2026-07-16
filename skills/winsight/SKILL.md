@@ -55,7 +55,11 @@ Capture by exact HWND:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/winsight.ps1 -Action capture -Hwnd 123456 -Backend auto
 ```
 
-Use `auto` by default. It currently tries off-screen-capable `PrintWindow(PW_RENDERFULLCONTENT)` first and visible-screen GDI capture second. Read [references/backends.md](references/backends.md) before extending WGC, DXGI, continuous capture, or OCR.
+Use `auto` by default. It tries off-screen-capable WGC first, then `PrintWindow(PW_RENDERFULLCONTENT)`, monitor-cropped DXGI Desktop Duplication, and finally visible-screen GDI. WGC never calls `IsBorderRequired` on unsupported Windows builds. DXGI captures the rendered desktop and therefore includes occluding windows.
+
+The WGC helper is compiled into the local app-data cache. On machines without SDK contract metadata, first use downloads a pinned Microsoft SDK Contracts package from NuGet, verifies its SHA-256, and caches only the build metadata; later captures run offline. If this fails, the attempt metadata records the reason and `auto` continues to the next backend.
+
+Read [references/backends.md](references/backends.md) before extending continuous capture, recording, or OCR.
 
 ## Validation
 

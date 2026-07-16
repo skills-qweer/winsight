@@ -24,6 +24,18 @@ public static class WinSightNative
         public int Y;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MONITORINFOEX
+    {
+        public int Size;
+        public RECT Monitor;
+        public RECT Work;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string Device;
+    }
+
     public sealed class WindowInfo
     {
         public long Hwnd { get; set; }
@@ -40,6 +52,12 @@ public static class WinSightNative
         public int ClientWidth { get; set; }
         public int ClientHeight { get; set; }
         public int Dpi { get; set; }
+        public bool Minimized { get; set; }
+        public int MonitorX { get; set; }
+        public int MonitorY { get; set; }
+        public int MonitorWidth { get; set; }
+        public int MonitorHeight { get; set; }
+        public string MonitorDevice { get; set; }
     }
 
     public sealed class CaptureInfo
@@ -101,6 +119,15 @@ public static class WinSightNative
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFOEX info);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hwnd, int command);
@@ -176,6 +203,11 @@ public static class WinSightNative
                 dpi = 96;
             }
 
+            MONITORINFOEX monitorInfo = new MONITORINFOEX();
+            monitorInfo.Size = Marshal.SizeOf(typeof(MONITORINFOEX));
+            IntPtr monitor = MonitorFromWindow(hwnd, 2u);
+            bool hasMonitor = monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref monitorInfo);
+
             windows.Add(new WindowInfo
             {
                 Hwnd = hwnd.ToInt64(),
@@ -191,7 +223,13 @@ public static class WinSightNative
                 ClientY = hasClientRect ? clientOrigin.Y : rect.Top,
                 ClientWidth = hasClientRect ? Math.Max(0, clientRect.Right - clientRect.Left) : Math.Max(0, rect.Right - rect.Left),
                 ClientHeight = hasClientRect ? Math.Max(0, clientRect.Bottom - clientRect.Top) : Math.Max(0, rect.Bottom - rect.Top),
-                Dpi = dpi
+                Dpi = dpi,
+                Minimized = IsIconic(hwnd),
+                MonitorX = hasMonitor ? monitorInfo.Monitor.Left : 0,
+                MonitorY = hasMonitor ? monitorInfo.Monitor.Top : 0,
+                MonitorWidth = hasMonitor ? Math.Max(0, monitorInfo.Monitor.Right - monitorInfo.Monitor.Left) : 0,
+                MonitorHeight = hasMonitor ? Math.Max(0, monitorInfo.Monitor.Bottom - monitorInfo.Monitor.Top) : 0,
+                MonitorDevice = hasMonitor ? monitorInfo.Device : null
             });
             return true;
         }, IntPtr.Zero);
@@ -276,6 +314,21 @@ public static class WinSightNative
         catch (Exception exception)
         {
             return Failure("gdi-screen", outputPath, exception.Message);
+        }
+    }
+
+    public static CaptureInfo AnalyzeImageFile(string outputPath, string backend)
+    {
+        try
+        {
+            using (Bitmap bitmap = new Bitmap(outputPath))
+            {
+                return Analyze(bitmap, backend, outputPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            return Failure(backend, outputPath, exception.Message);
         }
     }
 

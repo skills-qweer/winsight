@@ -1,6 +1,6 @@
 {
   "name": "winsight",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Reliable Windows window capture, coordinate mapping, and controlled local input for Codex.",
   "author": {
     "name": "skills-qweer",

@@ -35,3 +35,9 @@
 - Date: 2026-07-17
 - Decision: Do not add gift-event rules, Douyin integration, or routine per-click user confirmation. Continue the original window capture, mapping, tracking, OCR, change-detection, recording, and safe local input roadmap.
 - Reason: The gift example was only a possible implementation analogy and introduced unrelated scope and unnecessary friction.
+
+## D007 - WGC source helper and DXGI provider
+
+- Date: 2026-07-17
+- Decision: Build the source-included WGC helper with the Windows-provided .NET Framework compiler and a pinned, SHA-256-verified Microsoft SDK Contracts cache; use FFmpeg `ddagrab` as the current DXGI Desktop Duplication provider.
+- Reason: The machine has the required runtime APIs but no Visual Studio or .NET SDK. This preserves a small install footprint while retaining public-source, independently testable implementations and explicit fallback behavior.

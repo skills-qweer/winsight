@@ -12,7 +12,7 @@ const SCRIPT_ROOT = path.join(ROOT, "skills", "winsight", "scripts");
 const CAPTURE_SCRIPT = path.join(SCRIPT_ROOT, "winsight.ps1");
 const INPUT_SCRIPT = path.join(SCRIPT_ROOT, "input.ps1");
 const SERVER_NAME = "WinSight MCP";
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.3.0";
 const TOKEN_TTL_MS = 30_000;
 const preparedInputs = new Map();
 let inputEnabled = true;
@@ -254,7 +254,7 @@ const tools = [
       type: "object",
       properties: {
         ...selectorSchema(),
-        backend: { type: "string", enum: ["auto", "printwindow", "gdi-screen"], default: "auto" },
+        backend: { type: "string", enum: ["auto", "wgc", "printwindow", "dxgi", "gdi-screen"], default: "auto" },
       },
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

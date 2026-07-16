@@ -4,7 +4,7 @@
 
 - `diagnose_capture`: report OS/API compatibility.
 - `list_windows`: return HWND, PID, process, title, window/client bounds, DPI, and scale.
-- `capture_window`: return PNG image content plus backend and frame-quality evidence.
+- `capture_window`: return PNG image content plus backend and frame-quality evidence. Backends are `auto`, `wgc`, `printwindow`, `dxgi`, and `gdi-screen`.
 - `map_coordinates`: convert window/client, normalized, or logical coordinates to screen and capture pixels.
 
 ## Input tools

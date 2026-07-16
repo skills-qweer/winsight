@@ -74,5 +74,33 @@ Evidence:
 - Benign WeChat game click executed and the after-capture visibly advanced to Chapter 1
 - Emergency-stop rejection and Creator login-surface guard passed
 - Skill, plugin, and project-document validators passed
+- Commit `118d34e` pushed to `origin/main`
+- Personal plugin `winsight@personal` installed and enabled as `0.2.0+codex.20260716193039`
+- Standalone skill refreshed from GitHub at `D:\CodexHome\skills\winsight`; previous v0.1 preserved under `D:\CodexHome\skill-backups`
 
 M03-M05 remain in `ACCEPTANCE.md`; their pending state does not reopen WS-003 development.
+
+## WS-004 - Version-safe WGC and DXGI capture backends
+
+- Development completed: 2026-07-17
+- Development state: `AUTO_VERIFIED`
+- Acceptance: M09-M10 are `AUTO_VERIFIED`
+
+Delivered:
+
+- Source-included WGC helper using `IGraphicsCaptureItemInterop::CreateForWindow`, a D3D11 device, and a free-threaded capture frame pool
+- No access to `GraphicsCaptureSession.IsBorderRequired`, preserving Windows 10 build 19045 compatibility
+- Stale first-frame size rejection to prevent black padding and coordinate drift after window resizing
+- Pinned Microsoft SDK Contracts 10.0.19041.2 first-use cache with SHA-256 verification when local build metadata is absent
+- DXGI Desktop Duplication through FFmpeg `ddagrab`, with owning-monitor window crop and explicit failure categories
+- Monitor bounds/device/output-index and minimized-state discovery metadata
+- Automatic backend order: WGC, PrintWindow, DXGI, GDI screen crop
+- Explicit backend regression script and MCP coverage for WGC and DXGI
+
+Evidence:
+
+- WGC WeChat capture: 1618x1075, mean RGB 44.56, non-black
+- WGC Creator capture: 1518x958, mean RGB 49.42, non-black while the window was covered
+- DXGI WeChat crop: 1618x1075, `DISPLAY1` output 0, non-black
+- `scripts/test_backends.ps1`: WGC, DXGI, and auto passed with exact target dimensions; auto selected WGC
+- `scripts/test_mcp.mjs`: server 0.3.0, explicit backends `wgc` and `dxgi`, valid PNG and mapping evidence

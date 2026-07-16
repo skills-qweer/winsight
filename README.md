@@ -19,6 +19,15 @@ Version 0.2 adds a local MCP server with:
 - target identity and bounds revalidation before input;
 - emergency stop, replay protection, and blocked sensitive surfaces.
 
+Version 0.3 adds native multi-backend capture:
+
+- Windows Graphics Capture by HWND on Windows 10 build 19045 without touching unsupported border APIs;
+- DXGI Desktop Duplication through FFmpeg `ddagrab`, with monitor-aware window cropping;
+- explicit minimized, multi-output, dependency, access, session-limit, and device-loss failure categories;
+- automatic order: WGC, PrintWindow, DXGI, then visible GDI.
+
+The WGC helper builds into the user's local app-data cache. If Windows SDK contract metadata is absent, first use downloads the pinned Microsoft `Microsoft.Windows.SDK.Contracts` 10.0.19041.2 package from NuGet and verifies its SHA-256 before compiling; later captures run offline.
+
 The implementation is independent and uses public Windows APIs. It does not copy proprietary code from streaming applications.
 
 ## Quick test
@@ -32,11 +41,9 @@ node .\scripts\test_mcp.mjs
 
 ## Roadmap
 
-- WGC `CreateForWindow` capture that skips unavailable border APIs;
-- DXGI Desktop Duplication with multi-monitor cropping;
 - continuous D3D11 frame sessions and stale-frame detection;
-- DPI-aware coordinate transforms and region-of-interest capture;
-- an MCP image tool so captures can be returned directly without temporary-file plumbing;
+- window tracking and material-change scoring;
+- bounded frame recording and region-of-interest capture;
 - OCR and visual-change monitoring as optional higher layers.
 
 WinSight intentionally excludes DRM bypass, authentication automation, security-setting changes, and hidden process injection.

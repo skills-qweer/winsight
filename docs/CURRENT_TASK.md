@@ -1,37 +1,39 @@
 # Current task
 
-- ID: `WS-004`
-- Title: Add version-safe WGC and DXGI capture backends
+- ID: `WS-005`
+- Title: Add tracking, change detection, recording, ROI, and OCR
 - State: `IN_PROGRESS`
 - Owner: Codex
 - Last updated: 2026-07-17
 
 ## Goal
 
-Add real native capture alternatives for windows that return black or incomplete PrintWindow frames, while preserving correct monitor, DPI, crop, and recovery behavior on Windows 10 build 19045.
+Turn one-shot capture into a bounded observation layer that can follow a stable window, detect meaningful visual changes, record evidence without unbounded growth, crop regions reliably, and recognize visible text.
 
 ## In scope
 
-- Add a Windows Graphics Capture backend that does not call unsupported optional APIs
-- Add a DXGI Desktop Duplication fallback with monitor-aware window cropping
-- Handle minimized, occluded, black-frame, device-loss, and window-recreation outcomes explicitly
-- Preserve capture metadata and backend-attempt evidence through the MCP response
-- Add deterministic backend-selection and real-window validation
+- Track HWND identity, process, title, bounds, client bounds, DPI, visibility, and recreation/move/resize events
+- Compute stable material-change scores between frames and support region-of-interest comparison
+- Record bounded multi-backend frame sequences with a manifest and retention limits
+- Crop window/client/normalized/logical regions with reliable source-to-screen metadata
+- Add an OCR provider with explicit availability and confidence/region evidence
+- Expose the new capabilities as MCP tools and deterministic tests
 
 ## Not in scope
 
-- Continuous tracking, recording, OCR, and material-change scoring (`WS-005`)
+- Unbounded background monitoring or hidden persistence
 - Authentication, protected-content bypass, process injection, or private capture hooks
 - Authentication, CAPTCHA, password, permission, payment, or Windows security UI automation
 
 ## Done when
 
-- WGC captures a real target on build 19045 without touching `IsBorderRequired`
-- DXGI can crop the correct target from the owning monitor when the target is visible
-- `auto` records every attempted backend and chooses the first valid non-black frame
-- Device loss and unsupported/minimized states return explicit recoverable errors
+- Tracking reports continuity plus move/resize/DPI/title/window-recreation changes
+- Change scores remain low for stable frames and cross a configured threshold for visible changes
+- A 60-second-capable recording path enforces frame/count/byte/time bounds and writes a valid manifest
+- ROI capture metadata round-trips to current screen coordinates
+- OCR returns text and regions or a clear provider-unavailable result
 - MCP, skill, plugin, project-doc, and real-window tests pass
 
 ## Next concrete action
 
-Inventory the available Windows SDK/runtime and FFmpeg/DXGI capabilities, then choose the smallest maintainable native helper architecture before editing capture code.
+Inventory built-in OCR options and design one bounded session model shared by tracking, change detection, and recording.

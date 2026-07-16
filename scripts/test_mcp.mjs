@@ -31,6 +31,14 @@ function callTool(name, args = {}) {
   return request("tools/call", { name, arguments: args });
 }
 
+function assertPng(result, label) {
+  const image = result.content.find((item) => item.type === "image");
+  if (!image || image.mimeType !== "image/png") throw new Error(`${label} did not return PNG image content.`);
+  const signature = Buffer.from(image.data, "base64").subarray(0, 8).toString("hex");
+  if (signature !== "89504e470d0a1a0a") throw new Error(`${label} returned an invalid PNG signature.`);
+  return signature;
+}
+
 try {
   const initialized = await request("initialize", { protocolVersion: "2025-11-25" });
   const listed = await request("tools/list");
@@ -39,10 +47,11 @@ try {
   if (windows.structuredContent.count !== 1) throw new Error("Expected one FogHarborEchoes window.");
   const hwnd = windows.structuredContent.windows[0].hwnd;
   const captured = await callTool("capture_window", { hwnd, backend: "auto" });
-  const image = captured.content.find((item) => item.type === "image");
-  if (!image || image.mimeType !== "image/png") throw new Error("capture_window did not return PNG image content.");
-  const signature = Buffer.from(image.data, "base64").subarray(0, 8).toString("hex");
-  if (signature !== "89504e470d0a1a0a") throw new Error("capture_window returned an invalid PNG signature.");
+  const signature = assertPng(captured, "auto capture_window");
+  const wgcCaptured = await callTool("capture_window", { hwnd, backend: "wgc" });
+  assertPng(wgcCaptured, "WGC capture_window");
+  const dxgiCaptured = await callTool("capture_window", { hwnd, backend: "dxgi" });
+  assertPng(dxgiCaptured, "DXGI capture_window");
 
   const mapped = await callTool("map_coordinates", {
     hwnd,
@@ -86,6 +95,10 @@ try {
     diagnosisBuild: diagnosed.structuredContent.build,
     hwnd,
     captureBackend: captured.structuredContent.selected.Backend,
+    explicitBackends: [
+      wgcCaptured.structuredContent.selected.Backend,
+      dxgiCaptured.structuredContent.selected.Backend,
+    ],
     captureSize: {
       width: captured.structuredContent.selected.Width,
       height: captured.structuredContent.selected.Height,
