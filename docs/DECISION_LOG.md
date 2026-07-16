@@ -41,3 +41,9 @@
 - Date: 2026-07-17
 - Decision: Build the source-included WGC helper with the Windows-provided .NET Framework compiler and a pinned, SHA-256-verified Microsoft SDK Contracts cache; use FFmpeg `ddagrab` as the current DXGI Desktop Duplication provider.
 - Reason: The machine has the required runtime APIs but no Visual Studio or .NET SDK. This preserves a small install footprint while retaining public-source, independently testable implementations and explicit fallback behavior.
+
+## D008 - Bounded observation and local OCR
+
+- Date: 2026-07-17
+- Decision: Observation sessions expire after ten inactive minutes and are capped at sixteen; recordings are capped by time, frame count, and bytes; OCR runs locally through Windows.Media.Ocr with bounded MCP output.
+- Reason: Tracking and recording must remain useful without creating hidden persistence, unbounded memory/disk growth, or cloud image disclosure.

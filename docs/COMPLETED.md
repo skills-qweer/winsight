@@ -104,3 +104,32 @@ Evidence:
 - DXGI WeChat crop: 1618x1075, `DISPLAY1` output 0, non-black
 - `scripts/test_backends.ps1`: WGC, DXGI, and auto passed with exact target dimensions; auto selected WGC
 - `scripts/test_mcp.mjs`: server 0.3.0, explicit backends `wgc` and `dxgi`, valid PNG and mapping evidence
+
+## WS-005 - Tracking, change detection, bounded recording, ROI, and OCR
+
+- Development completed: 2026-07-17
+- Development state: `AUTO_VERIFIED`
+- Acceptance: M11-M14 are `AUTO_VERIFIED`
+
+Delivered:
+
+- Fourteen-tool MCP surface spanning capture, ROI, bounded observation sessions, recording, OCR, coordinate mapping, and controlled input
+- Ten-minute/16-session bounded HWND tracking with recreation, process, title, window/client bounds, DPI, visibility, and minimized-state reporting
+- Normalized sampled RGB change scoring with per-pixel threshold, changed fraction, dimension-change handling, and material threshold
+- Window/client/normalized/logical ROI mapping with round-trip screen and capture-pixel bounds
+- Local recordings bounded by duration, frame count, and total bytes, with full JSON manifests and capped MCP response summaries
+- Local Windows.Media.Ocr provider with language, text, line, word, and bounding-box results plus explicit absence of confidence data
+- Capture-time window metadata reconciliation so observation and input mappings bind to the actual frame rather than stale pre-capture bounds
+
+Evidence:
+
+- Stable ROI poll: score 0 and no continuity changes
+- Different same-size game ROI: score 0.059552, above default 0.05 material threshold
+- Isolated tracking fixture: moved/resized from 520x360 at (120,120) to 680x460 at (260,210); window and client changes reported
+- ROI mapping: normalized source mapped to 453x967 at capture (1133,54) and screen (2032,361), DPI 96
+- Windows.Media.Ocr: `zh-Hans-CN`, eight ROI lines with word boxes
+- Bounded recording: six-second test retained two frames/82,562 bytes, stopped by duration, manifest readable
+- Full real-window suite passed with MCP server 0.4.0 and fourteen tools
+- Commit `d80a22b` pushed to `origin/main`
+- Personal plugin installed and enabled as `0.4.0+codex.20260716201224`
+- Standalone skill refreshed from GitHub at `D:\CodexHome\skills\winsight`; v0.1/v0.2 backups preserved outside the active skills directory

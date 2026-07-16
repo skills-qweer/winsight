@@ -1,10 +1,10 @@
 # Project status
 
 - Project: WinSight
-- Phase: v0.4 observation and OCR layer
-- Overall: v0.3 native multi-backend capture is `AUTO_VERIFIED`; tracking/change/recording/OCR work is `IN_PROGRESS`
-- Current task: `WS-005`
-- Current task state: `IN_PROGRESS`
+- Phase: v0.4 foundation complete
+- Overall: requested capture, MCP image, safe input, WGC/DXGI, tracking, change, recording, ROI, and OCR scope is `AUTO_VERIFIED`
+- Current task: `WS-006`
+- Current task state: `DEFERRED`
 - Last updated: 2026-07-17
 
 ## Progress summary
@@ -27,12 +27,12 @@
 | Material-change detection | AUTO_VERIFIED | Stable score 0; changed same-size game ROI score 0.059552 |
 | ROI and bounded recording | AUTO_VERIFIED | 453x967 mapping plus duration/frame/byte-bounded manifest test passed |
 | Local OCR | AUTO_VERIFIED | Windows.Media.Ocr `zh-Hans-CN`, 8 ROI lines and word boxes |
-| v0.4 publication and installation | IN_PROGRESS | Final WS-005 step |
+| v0.4 publication and installation | AUTO_VERIFIED | Commit `d80a22b`; personal plugin `0.4.0+codex.20260716201224`; standalone skill refreshed |
 
 ## Next action
 
-Run the full v0.4 regression suite, push the release commit, and refresh the personal plugin and standalone skill installations.
+Use WinSight v0.4 in the next real Windows-app task; resume implementation only from a reproducible defect or explicit enhancement request.
 
 ## User involvement
 
-M03-M05 remain pending explicit acceptance. M06-M08 are automatically verified. Routine safe local app input proceeds without per-action confirmation; sensitive or consequential surfaces remain blocked or require exact authorization.
+M03-M05 remain optional legacy acceptance checks and do not block v0.4. M06-M14 are automatically verified. Routine safe local app input proceeds without per-action confirmation; sensitive or consequential surfaces remain blocked or require exact authorization.
