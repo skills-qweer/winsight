@@ -1,5 +1,24 @@
 # Completed work archive
 
+## WS-007 - User-facing README
+
+- Completed: 2026-08-01
+- Final state: `ARCHIVED`
+- Acceptance: Documentation-only change; no new manual acceptance required
+
+Delivered:
+
+- Reworked the repository README around WinSight's user-facing purpose and suitable scenarios
+- Added copyable `$winsight` examples for capture, OCR, observation, coordinate mapping, and controlled local input
+- Documented screenshot backends, coordinate types, input handshake, prohibited sensitive surfaces, plugin/source separation, fallback commands, and project-state links
+- Preserved the distinction between automated evidence and user acceptance
+
+Evidence:
+
+- README content reconciled with the v0.4 skill contract and MCP capabilities
+- `python scripts/check_project_docs.py`: passed
+- No runtime implementation or acceptance result changed
+
 ## WS-001 - Capture foundation
 
 - Completed: 2026-07-17

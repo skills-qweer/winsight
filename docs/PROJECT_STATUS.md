@@ -5,7 +5,7 @@
 - Overall: requested capture, MCP image, safe input, WGC/DXGI, tracking, change, recording, ROI, and OCR scope is `AUTO_VERIFIED`
 - Current task: `WS-006`
 - Current task state: `DEFERRED`
-- Last updated: 2026-07-17
+- Last updated: 2026-08-01
 
 ## Progress summary
 
@@ -28,6 +28,7 @@
 | ROI and bounded recording | AUTO_VERIFIED | 453x967 mapping plus duration/frame/byte-bounded manifest test passed |
 | Local OCR | AUTO_VERIFIED | Windows.Media.Ocr `zh-Hans-CN`, 8 ROI lines and word boxes |
 | v0.4 publication and installation | AUTO_VERIFIED | Commit `d80a22b`; personal plugin `0.4.0+codex.20260716201224`; standalone skill refreshed |
+| User-facing README | AUTO_VERIFIED | Purpose, Codex usage, capabilities, safety boundaries, fallbacks, and project-state links documented |
 
 ## Next action
 

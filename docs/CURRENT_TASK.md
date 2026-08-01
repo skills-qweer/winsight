@@ -4,7 +4,7 @@
 - Title: Hold the completed v0.4 foundation for real project use
 - State: `DEFERRED`
 - Owner: Codex and user
-- Last updated: 2026-07-17
+- Last updated: 2026-08-01
 
 ## Goal
 
