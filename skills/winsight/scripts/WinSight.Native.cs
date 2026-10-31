@@ -184,6 +184,18 @@ public static class WinSightNative
     private static extern bool SetCursorPos(int x, int y);
 
     [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT point);
+
+    public static long ForegroundWindowHandle() { return GetForegroundWindow().ToInt64(); }
+
+    public static POINT CursorPosition()
+    {
+        POINT point;
+        if (!GetCursorPos(out point)) throw new InvalidOperationException("Cannot observe cursor position");
+        return point;
+    }
+
+    [DllImport("user32.dll")]
     private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
     [DllImport("user32.dll")]

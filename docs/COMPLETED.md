@@ -1,5 +1,21 @@
 # Completed work archive
 
+## WS-006 - Windows 10 fallback and prepared background button invocation
+
+- Completed: 2026-10-31
+- Development state: `AUTO_VERIFIED`
+- User acceptance: no claim of general app or human acceptance
+
+The real Zhixu launcher on Windows 10 build 19045 returned WGC content 1046x753 for a 1060x760 window. The helper correctly rejected the mismatch, but Windows PowerShell 5 converted native stderr into a terminating error and skipped the existing PrintWindow fallback. Capture now captures helper failure as data, restores the caller error preference and keeps strict image-size checks. UTF-8 output and ASCII Unicode escapes preserve Chinese window titles and sensitive-title guards under PowerShell 5.
+
+Prepared `invoke` is a separate action for enabled, visible UI Automation buttons. It binds HWND/window geometry and the button runtime ID, name, automation ID, process and rectangle. It calls InvokePattern without focus, cursor or synthetic-input APIs and never falls back to foreground clicking. Native input failure now throws instead of being reported as executed. Authentication/security/payment boundaries, thirty-second single-use tokens and drift checks remain.
+
+Evidence: native-stderr/Chinese-guard regression passed; stale-control-name regression rejected invocation before action. MCP rejected token replay, a blank coordinate and the Preview login surface. The actual Stable launcher Download and Open buttons were invoked through the prepared MCP handshake. Download invocation kept the same foreground HWND; cursor readings changed while the user was working and are not claimed as unchanged. The installed plugin's fresh MCP connection also opened Final 1.0.0. Real installed app.asar matched its published ZIP and the Final login window was verified read-only. Background UI sometimes retained an old progress frame; the launcher's own show command refreshed it after filesystem installation had completed. This does not establish a general screenshot freshness guarantee for occluded Chromium windows.
+
+Both installed copies were updated after matching the previous source and hashes: personal plugin `0.4.0+codex.20260716201224` and standalone skill under `D:/CodexHome/skills/winsight`. Nine files match source; original files, before/after hashes and rollback targets are in `D:/CodexHome/update-helper/winsight-20261031/manifest.json`. The current chat still caches the old registered tool schema; the new action was verified via a fresh connection to the installed MCP server. Reconnect the plugin to refresh its ordinary tool list. Plugin upgrades may overwrite these local changes; compare source before reapplying.
+
+Remaining boundary: native Codex CUA still refused activation. Caller, target and input desktop were Default in session 1; that alone does not establish the exact foreground-policy cause. No Codex binary, OS focus policy or security setting was modified. Background invocation supports accessible buttons, not arbitrary canvases, gestures or credential surfaces. Invoked applications may themselves open or focus windows. Legacy optional checks remain in ACCEPTANCE.md; they are not an automatic work queue.
+
 ## WS-007 - User-facing README
 
 - Completed: 2026-08-01

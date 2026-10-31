@@ -35,12 +35,14 @@ Check the returned screen, capture-pixel, bounds, DPI, and scale metadata. Re-ma
 
 ## Operate a safe local app
 
-1. Call `prepare_input` with an exact HWND and a click or allowlisted key.
+1. Call `prepare_input` with an exact HWND. Prefer `action=invoke` for a supported button when background operation is required; it binds the UI Automation control identity as well as the mapped point. Ordinary `click` and allowlisted `key` actions activate the window and must not be used when the user is working elsewhere and asks for no focus changes.
 2. Inspect the returned current image and mapping. Preparation does not execute input.
 3. Call `execute_prepared_input` with the token. It executes automatically only if the token is unexpired and the HWND identity, title, bounds, client bounds, and DPI are unchanged.
 4. Capture again and verify the visible result. Do not treat the input API return value alone as success.
 
 Tokens expire after 30 seconds and are single-use. Use `emergency_stop_input` to cancel all pending input and disable execution; use `resume_input` to resume safe local actions.
+
+Background invoke never moves the pointer, calls focus/activation APIs, or falls back to foreground input. Unsupported, hidden, disabled, changed or ambiguous buttons fail closed. The invoked application can itself open a new window; check that consequence before invoking Open or similar actions. Returned foreground/cursor observations are evidence, not a guarantee about every application's behavior.
 
 ## Input boundaries
 

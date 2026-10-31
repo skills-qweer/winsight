@@ -21,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $selectionMode = $PSCmdlet.ParameterSetName
 $nativeSource = Join-Path $PSScriptRoot 'WinSight.Native.cs'
 if (-not ('WinSightNative' -as [type])) {
@@ -189,10 +190,23 @@ function Invoke-WgcCapture {
         return New-CaptureFailure -Backend 'wgc' -OutputPath $OutputPath -Error $_.Exception.Message -ErrorCode 'helper_build_failed'
     }
 
-    $diagnostic = @(& $helperPath ([string]$Target.hwnd) $OutputPath 2>&1 | ForEach-Object { $_.ToString() })
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) {
+    # Windows PowerShell 5 wraps redirected native stderr in ErrorRecord. Keep
+    # that diagnostic as data so auto can try the next capture backend.
+    $previousErrorPreference = $ErrorActionPreference
+    $helperExitCode = $null
+    try {
+        $ErrorActionPreference = 'Continue'
+        $LASTEXITCODE = $null
+        $diagnostic = @(& $helperPath ([string]$Target.hwnd) $OutputPath 2>&1 | ForEach-Object { $_.ToString() })
+        $helperExitCode = $LASTEXITCODE
+    } catch {
+        return New-CaptureFailure -Backend 'wgc' -OutputPath $OutputPath -Error $_.Exception.Message -ErrorCode 'helper_start_failed'
+    } finally {
+        $ErrorActionPreference = $previousErrorPreference
+    }
+    if ($helperExitCode -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) {
         $message = ($diagnostic -join "`n").Trim()
-        if (-not $message) { $message = "The WGC helper exited with code $LASTEXITCODE." }
+        if (-not $message) { $message = "The WGC helper exited with code $helperExitCode." }
         $errorCode = if ($message -match '0x80004002|E_NOINTERFACE') { 'interface_not_supported' }
             elseif ($message -match '0x80070005|access denied') { 'access_denied' }
             elseif ($message -match 'Timeout') { 'frame_timeout' }

@@ -47,3 +47,10 @@
 - Date: 2026-07-17
 - Decision: Observation sessions expire after ten inactive minutes and are capped at sixteen; recordings are capped by time, frame count, and bytes; OCR runs locally through Windows.Media.Ocr with bounded MCP output.
 - Reason: Tracking and recording must remain useful without creating hidden persistence, unbounded memory/disk growth, or cloud image disclosure.
+
+## D009 - Separate background invocation from foreground input
+
+- Date: 2026-10-31
+- Decision: Use a separately prepared UI Automation InvokePattern action for supported buttons, with window and control identity revalidation. Never silently convert an unsupported background action into a foreground click.
+- Evidence: The actual Zhixu Download / Open buttons expose InvokePattern; real prepared invocations completed installation and launch. Windows foreground activation can be refused, and read-only capture recovery does not fix it.
+- References: https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/implementing-the-ui-automation-invoke-control-pattern and https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow

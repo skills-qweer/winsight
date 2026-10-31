@@ -531,12 +531,12 @@ const tools = [
   {
     name: "prepare_input",
     title: "Prepare Controlled Window Input",
-    description: "Capture the current target and prepare a short-lived single-use click or allowlisted key action without executing it.",
+    description: "Capture and prepare a single-use action. invoke calls a supported UI Automation button without moving the pointer or activating its window; no foreground fallback. click/key require foreground activation.",
     inputSchema: {
       type: "object",
       properties: {
         ...selectorSchema(),
-        action: { type: "string", enum: ["click", "key"] },
+        action: { type: "string", enum: ["click", "key", "invoke"] },
         area: { type: "string", enum: ["window", "client"], default: "window" },
         coordinateSpace: { type: "string", enum: ["window_pixels", "client_pixels", "normalized", "logical"], default: "window_pixels" },
         x: { type: "number" },
@@ -813,14 +813,22 @@ async function handleToolCall(name, args) {
     const window = captured.window ?? resolvedWindow;
     assertInputSurfaceAllowed(window);
     let action;
-    if (args.action === "click") {
-      action = { type: "click", mapping: mapCoordinates(window, args) };
+    if (args.action === "click" || args.action === "invoke") {
+      action = { type: args.action, mapping: mapCoordinates(window, args) };
+      if (args.action === "invoke") {
+        const inspected = await runPowerShell(INPUT_SCRIPT, [
+          "-Action", "inspect-invoke", "-Hwnd", window.hwnd,
+          "-ScreenX", action.mapping.screen.x, "-ScreenY", action.mapping.screen.y,
+        ]);
+        if (!inspected.control?.runtimeId) throw new Error("No invokable control identity was returned.");
+        action.control = inspected.control;
+      }
     } else if (args.action === "key") {
       const key = String(args.key ?? "").toUpperCase();
       if (!ALLOWED_KEYS.has(key)) throw new Error(`key must be one of: ${[...ALLOWED_KEYS].join(", ")}`);
       action = { type: "key", key };
     } else {
-      throw new Error("action must be click or key.");
+      throw new Error("action must be click, key, or invoke.");
     }
 
     const token = crypto.randomUUID();
@@ -858,18 +866,21 @@ async function handleToolCall(name, args) {
       throw new Error("Target window identity, title, bounds, client bounds, or DPI changed. Prepare a new action.");
     }
 
-    const actionDescription = prepared.action.type === "click"
-      ? `Click ${currentWindow.process} / ${currentWindow.title} at screen (${prepared.action.mapping.screen.x}, ${prepared.action.mapping.screen.y}), capture pixel (${prepared.action.mapping.capturePixel.x}, ${prepared.action.mapping.capturePixel.y}).`
+    const actionDescription = prepared.action.type !== "key"
+      ? `${prepared.action.type} ${currentWindow.process} / ${currentWindow.title} at screen (${prepared.action.mapping.screen.x}, ${prepared.action.mapping.screen.y}), capture pixel (${prepared.action.mapping.capturePixel.x}, ${prepared.action.mapping.capturePixel.y}).`
       : `Send key ${prepared.action.key} to ${currentWindow.process} / ${currentWindow.title}.`;
     prepared.used = true;
     preparedInputs.delete(token);
     let result;
-    if (prepared.action.type === "click") {
+    if (prepared.action.type !== "key") {
       result = await runPowerShell(INPUT_SCRIPT, [
-        "-Action", "click",
+        "-Action", prepared.action.type,
         "-Hwnd", currentWindow.hwnd,
         "-ScreenX", prepared.action.mapping.screen.x,
         "-ScreenY", prepared.action.mapping.screen.y,
+        ...(prepared.action.type === "invoke"
+          ? ["-ExpectedControl", Buffer.from(JSON.stringify(prepared.action.control), "utf8").toString("base64")]
+          : []),
       ]);
     } else {
       result = await runPowerShell(INPUT_SCRIPT, [
@@ -877,6 +888,9 @@ async function handleToolCall(name, args) {
         "-Hwnd", currentWindow.hwnd,
         "-Key", prepared.action.key,
       ]);
+    }
+    if (result?.result?.Success !== true) {
+      throw new Error(result?.result?.Error || "Input provider did not confirm execution.");
     }
     return textResult(`Executed: ${actionDescription}`, { status: "executed", action: prepared.action, result });
   }
